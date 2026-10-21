@@ -38,10 +38,28 @@ verify_app() {
   test "$(plutil -extract CFBundlePackageType raw "$plist")" = "APPL"
   test "$(plutil -extract CFBundleShortVersionString raw "$plist")" = "$VERSION"
   test -n "$(plutil -extract CFBundleVersion raw "$plist")"
+  local architectures
+  architectures="$(lipo -archs "$app/Contents/MacOS/Captures")"
+  for required_arch in arm64 x86_64; do
+    case " $architectures " in
+      *" $required_arch "*) ;;
+      *) echo "Missing $required_arch architecture in $source" >&2; exit 1 ;;
+    esac
+  done
+  test -f "$app/Contents/Resources/LICENSE"
+  test -f "$app/Contents/Resources/NOTICE"
 }
 
 test -f "$DMG"
 test -f "$ZIP"
+
+if [ -f "$ARTIFACT_DIR/SHA256SUMS" ]; then
+  (cd "$ARTIFACT_DIR" && shasum -a 256 -c SHA256SUMS)
+fi
+
+codesign --verify --verbose=2 "$DMG"
+xcrun stapler validate "$DMG"
+spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG"
 
 mkdir -p "$WORK_DIR/zip"
 ditto -x -k "$ZIP" "$WORK_DIR/zip"

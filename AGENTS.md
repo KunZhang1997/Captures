@@ -9,7 +9,7 @@ Always use Apple identity signing. Never use ad-hoc signing. All builds must be 
 - GitHub releases at https://github.com/KunZhang1997/Captures/releases
 - Tag format: `v{major}.{minor}.{patch}` (e.g. `v1.5.0`)
 - DMG naming: `Captures-{version}.dmg` (e.g. `Captures-1.1.0.dmg`)
-- This fork initially publishes source only. The website links to the source build instructions until a verified installer exists. Future binary releases must publish `Captures-latest.dmg` alongside the versioned DMG.
+- Public binary releases are built locally with Developer ID signing, notarized, verified, and manually uploaded to GitHub Releases. Publish `Captures-latest.dmg` alongside the versioned DMG and ZIP. README and website download links use the stable DMG alias.
 
 ## Website
 

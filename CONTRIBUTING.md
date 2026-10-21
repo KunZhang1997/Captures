@@ -39,7 +39,7 @@ Push 和 Pull Request 的 CI 检查项目生成、属性列表与脚本语法。
 swift design/generate-demo-reference.swift
 ```
 
-本地设计审查证据、原始截图、签名材料和环境配置不提交。发布安装包需要单独完成 Apple 签名、公证和产物验证，配置示例保留在 `docs/release-workflow.example.yml`，本仓库尚未启用自动发布安装包。
+本地设计审查证据、原始截图、签名材料和环境配置不提交。发布安装包需要单独完成 Apple 签名、公证和产物验证，配置示例保留在 `docs/release-workflow.example.yml`，本仓库尚未启用自动发布安装包；公开安装包由维护者在本机构建、公证并验证后手动上传。
 
 ## 许可
 

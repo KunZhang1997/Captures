@@ -3,7 +3,7 @@ const title = "Captures — Screenshot Tool for macOS";
 const description = "Captures 是一款开源 macOS 截图工具，支持区域与窗口截图、手动长截图、标注、OCR 和悬浮对照。截图与文字识别在本机完成。";
 const url = "https://github.com/KunZhang1997/Captures";
 const image = "https://raw.githubusercontent.com/KunZhang1997/Captures/main/website/public/icon.png";
-const source = `${url}#build-from-source`;
+const download = `${url}/releases/latest/download/Captures-latest.dmg`;
 ---
 
 <!doctype html>
@@ -50,6 +50,7 @@ const source = `${url}#build-from-source`;
       "description": description,
       "url": url,
       "codeRepository": url,
+      "downloadUrl": download,
       "license": "https://opensource.org/licenses/MIT",
       "author": {
         "@type": "Person",
@@ -108,15 +109,15 @@ const source = `${url}#build-from-source`;
       </div>
 
       <div class="cta fade" style="--i:3">
-        <a href={source} class="download">
+        <a href={download} class="download">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          查看源码与构建说明
+          下载 macOS 版
         </a>
-        <p class="meta">开源开发版&ensp;·&ensp;macOS 14+&ensp;·&ensp;安装包尚未发布</p>
+        <p class="meta">公开试用版&ensp;·&ensp;macOS 14+&ensp;·&ensp;Apple 芯片 / Intel</p>
       </div>
 
       <footer class="fade" style="--i:4">

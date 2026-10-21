@@ -13,7 +13,19 @@ Open-source screenshot tool for macOS, with quick annotation, manual scrolling c
 
 <img src="Captures/Resources/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" alt="Captures 图标" width="128" />
 
-当前为 **0.0.1 开发版**。本仓库先公开源码与构建方式，尚未发布可供下载的安装包。功能仍在迭代；自动检查、签名构建和真实使用验证的范围见[验证记录](docs/publication-validation.md)。
+当前为 **0.0.1 公开试用版**。提供经过 Apple Developer ID 签名和 Apple 公证的通用安装包，支持 Apple 芯片与 Intel Mac。功能仍在迭代，欢迎反馈使用中遇到的问题。
+
+## 下载与安装
+
+**[下载 Captures 安装包（DMG）](https://github.com/KunZhang1997/Captures/releases/latest/download/Captures-latest.dmg)** · [全部版本与 ZIP](https://github.com/KunZhang1997/Captures/releases)
+
+需要 **macOS 14 或更新版本**，Apple 芯片与 Intel 使用同一个安装包。
+
+1. 下载并打开 DMG，将 `Captures.app` 拖入 `Applications`（应用程序）。
+2. 从应用程序中打开 Captures。应用常驻菜单栏，通过菜单或快捷键开始截图。
+3. 按系统提示授予「屏幕录制」权限；如果系统要求重新打开应用，按提示操作。
+
+辅助功能权限为可选，用于处理快捷键冲突。[发布说明与校验记录](docs/releases/0.0.1.md)包含安装包验证范围；各版本同时提供 SHA256 校验文件。目前更新方式为手动下载新版本并替换应用。
 
 ## 能做什么
 
