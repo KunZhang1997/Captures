@@ -1,13 +1,13 @@
 ---
-const title = "Snapper — Screenshot Tool for macOS";
-const description = "The screenshot tool macOS deserves. Capture, annotate, and share screenshots instantly. Open source, privacy-first, free forever.";
-const url = "https://snapper.tools";
-const image = `${url}/icon.png`;
-const dmg = "https://github.com/nickshatilo/snapper/releases/latest/download/Snapper-latest.dmg";
+const title = "Captures — Screenshot Tool for macOS";
+const description = "Captures 是一款开源 macOS 截图工具，支持区域与窗口截图、手动长截图、标注、OCR 和悬浮对照。截图与文字识别在本机完成。";
+const url = "https://github.com/KunZhang1997/Captures";
+const image = "https://raw.githubusercontent.com/KunZhang1997/Captures/main/website/public/icon.png";
+const source = `${url}#build-from-source`;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="zh-Hans">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -25,8 +25,6 @@ const dmg = "https://github.com/nickshatilo/snapper/releases/latest/download/Sna
     <meta property="og:image:height" content="1024" />
 
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:site" content="@nickshatilo" />
-    <meta name="twitter:creator" content="@nickshatilo" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={image} />
@@ -45,18 +43,18 @@ const dmg = "https://github.com/nickshatilo/snapper/releases/latest/download/Sna
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "name": "Snapper",
+      "name": "Captures",
       "operatingSystem": "macOS 14+",
       "applicationCategory": "UtilitiesApplication",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "description": description,
       "url": url,
-      "downloadUrl": dmg,
+      "codeRepository": url,
       "license": "https://opensource.org/licenses/MIT",
       "author": {
         "@type": "Person",
-        "name": "Nick Shatilo",
-        "url": "https://nickshatilo.com"
+        "name": "Kun Zhang",
+        "url": "https://github.com/KunZhang1997"
       }
     })} />
   </head>
@@ -65,14 +63,14 @@ const dmg = "https://github.com/nickshatilo/snapper/releases/latest/download/Sna
     <main>
       <div class="hero fade" style="--i:0">
         <div class="icon-wrap">
-          <img src="/icon.png" alt="Snapper app icon" width="96" height="96" />
+          <img src="/icon.png" alt="Captures app icon" width="96" height="96" />
         </div>
-        <h1>Snapper</h1>
-        <p class="tagline">The screenshot tool macOS deserves.</p>
+        <h1>Captures</h1>
+        <p class="tagline">截图、标注、提取文字，在 Mac 上接着用。</p>
       </div>
 
       <div class="demo fade" style="--i:1">
-        <img src="/demo.gif" alt="Snapper in action — capture, annotate, and share" width="800" height="500" loading="eager" />
+        <img src="/demo.gif" alt="上游项目的功能示意动画" width="800" height="500" loading="eager" />
       </div>
 
       <div class="features fade" style="--i:2">
@@ -85,8 +83,8 @@ const dmg = "https://github.com/nickshatilo/snapper/releases/latest/download/Sna
             <circle cx="12" cy="12" r="3" />
           </svg>
           <div>
-            <h3>Capture</h3>
-            <p>Area, window, fullscreen & OCR</p>
+            <h3>截图</h3>
+            <p>区域、窗口、全屏与手动长截图</p>
           </div>
         </div>
         <div class="feature">
@@ -94,8 +92,8 @@ const dmg = "https://github.com/nickshatilo/snapper/releases/latest/download/Sna
             <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
           </svg>
           <div>
-            <h3>Annotate</h3>
-            <p>15+ tools built in</p>
+            <h3>标注与编辑</h3>
+            <p>箭头、文字、马赛克与图片编辑</p>
           </div>
         </div>
         <div class="feature">
@@ -103,36 +101,30 @@ const dmg = "https://github.com/nickshatilo/snapper/releases/latest/download/Sna
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
           </svg>
           <div>
-            <h3>Private</h3>
-            <p>No cloud. No account. Ever.</p>
+            <h3>本机处理</h3>
+            <p>截图与 OCR 在本机完成，无需账号</p>
           </div>
         </div>
       </div>
 
       <div class="cta fade" style="--i:3">
-        <a href={dmg} class="download">
+        <a href={source} class="download">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          Download for macOS
+          查看源码与构建说明
         </a>
-        <p class="meta">Free & open source&ensp;·&ensp;macOS 14+</p>
+        <p class="meta">开源开发版&ensp;·&ensp;macOS 14+&ensp;·&ensp;安装包尚未发布</p>
       </div>
 
       <footer class="fade" style="--i:4">
-        <a href="https://github.com/nickshatilo/snapper" aria-label="GitHub">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        </a>
+        <a href={url}>GitHub</a>
         <span class="dot"></span>
-        <a href="https://x.com/nickshatilo" aria-label="X / Twitter">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-        </a>
+        <a href={`${url}/issues`}>反馈问题</a>
         <span class="dot"></span>
-        <a href="https://nickshatilo.com">nickshatilo.com</a>
-        <span class="dot"></span>
-        <a href="mailto:shatilo.nick@gmail.com">shatilo.nick@gmail.com</a>
+        <a href="https://github.com/nickshatilo/snapper">基于 Nick Shatilo 的 Snapper</a>
       </footer>
     </main>
   </body>

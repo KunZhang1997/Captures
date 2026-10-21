@@ -5,13 +5,41 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      signed_build:
+        description: 'Run Apple-signed build and tests (requires signing secrets)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  validate-source:
+    name: Validate source configuration
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Validate property lists and release script
+        run: |
+          plutil -lint Captures/Resources/Info.plist
+          plutil -lint Captures/Resources/Captures.entitlements
+          bash -n scripts/verify-release-artifacts.sh
+      - name: Check patch formatting
+        run: git show --format= --check HEAD
+
+  signed-build-and-test:
+    name: Apple-signed build and tests
+    if: github.event_name == 'workflow_dispatch' && inputs.signed_build
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +53,7 @@ jobs:
       - name: Resolve package dependencies
         run: |
           xcodebuild -resolvePackageDependencies \
-            -scheme Snapper \
+            -scheme Captures \
             -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm"
 
       - name: Import Apple signing certificate
@@ -66,7 +94,7 @@ jobs:
       - name: Build
         run: |
           xcodebuild build \
-            -scheme Snapper \
+            -scheme Captures \
             -destination 'platform=macOS' \
             -configuration Debug \
             -derivedDataPath "$RUNNER_TEMP/build" \
@@ -78,7 +106,7 @@ jobs:
       - name: Test
         run: |
           xcodebuild test \
-            -scheme Snapper \
+            -scheme Captures \
             -destination 'platform=macOS' \
             -configuration Debug \
             -derivedDataPath "$RUNNER_TEMP/build" \

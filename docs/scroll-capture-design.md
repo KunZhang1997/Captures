@@ -2,20 +2,22 @@
 
 ## Goal
 
-Add a real scroll-capture mode to Snapper that works for:
+Add a real scroll-capture mode to capture that works for:
 
 - long web pages in browsers
 - scrollable panes inside Electron apps
-- any other on-screen scrollable region that can be automatically scrolled
+- any other on-screen scrollable region that responds to normal user scrolling
 
 The product requirement is:
 
 1. the user selects the target region
-2. Snapper scrolls it automatically
-3. Snapper captures a live video stream during the run
-4. Snapper stitches the newly revealed content into one tall screenshot
+2. the user scrolls it with the normal wheel or trackpad
+3. capture captures a live video stream during the run
+4. capture stitches the newly revealed content into one tall screenshot
 
-The user should not need to scroll manually.
+Captures must never claim that it is moving a page when the target application
+has ignored a synthetic event. Manual scrolling is the reliable product
+contract; Captures owns recording, visual motion confirmation, and stitching.
 
 ## Why video-first
 
@@ -24,7 +26,7 @@ The current app only captures still frames through `SCScreenshotManager`, which 
 - websites, Electron apps, PDFs, and native scroll views all reduce to pixels on screen
 - internal scroll areas often do not map cleanly to a whole window
 - visual stitching works even when we cannot introspect the app
-- automatic scrolling still needs visual confirmation, because a requested AX or wheel scroll may be ignored
+- every accepted manual movement still needs visual confirmation before stitching
 
 This should use `ScreenCaptureKit` streaming via `SCStream`, not a sequence of discrete screenshots.
 
@@ -36,28 +38,30 @@ The user flow should be:
 
 1. Start `Scroll Capture`.
 2. Select the scrollable region.
-3. Snapper identifies the likely scroll target near the center of that region.
-4. Snapper starts a live capture session for that region.
-5. Snapper auto-scrolls in small verified steps until the content stops moving.
-6. Snapper outputs a single tall screenshot through the normal result pipeline.
+3. capture brings the selected application forward.
+4. capture starts a live capture session for that region.
+5. the user scrolls while capture accepts only verified downward movement.
+6. capture outputs a single tall screenshot through the normal result pipeline.
 
-This should feel like a single-command capture mode, not an assisted recording tool.
+This should feel like a direct capture mode whose result action also ends the
+recording; there is no separate Stop step.
 
 ## Recommended Rollout
 
 ### Phase 1
 
-Ship an auto-scroll, area-based capture with video verification.
+Ship a manual-scroll, area-based capture with video verification.
 
 Scope:
 
 - area selection only
 - vertical scrolling only
 - one dominant direction per session
-- Accessibility-backed or synthetic-wheel auto-scroll
+- normal user wheel or trackpad input
 - output as normal image capture
 
-This gives the product the right behavior from day one: the app does the scrolling.
+This gives the product a behavior that works consistently across browsers,
+PDF viewers, Electron apps, and nested native scroll containers.
 
 ### Phase 2
 
@@ -149,19 +153,18 @@ Responsibilities:
 
 For the first version this can be an in-memory bitmap while the total height stays reasonable. It should be designed so it can later swap to a tiled backing store.
 
-#### `AutoScroller`
+#### `ScrollCaptureTargetController`
 
-Core session component responsible for driving the content.
+Session component responsible for resolving and activating the selected app.
 
 Responsibilities:
 
-- locate the scroll target under the selected point
-- attempt AX scroll actions first
-- fall back to synthetic scroll wheel events
-- wait for real motion confirmation from the estimator before issuing the next step
-- decide when the session has reached the end
+- locate the application under the selected point
+- bring that application forward so it receives normal input
+- leave scrolling to the person's real wheel or trackpad
 
-This is not optional. Scroll capture mode depends on it.
+The coordinator separately observes frames and the estimator remains the
+authority on whether downward movement is safe to append.
 
 ## Capture Pipeline
 
@@ -187,18 +190,17 @@ Suggested config:
 
 The stream does not need to be saved as a user-visible movie file. The frames are the source data.
 
-### 3. Verified scroll loop
+### 3. Verified manual-scroll loop
 
-For each auto-scroll step:
+For each newly observed frame:
 
-1. issue a scroll action
-2. wait for a new stable frame
-3. estimate movement against the last accepted frame
-4. reject the step if confidence is low
-5. retry with smaller or alternate scroll input if needed
-6. accept the frame only when enough new content was revealed
+1. wait for a new frame while the user scrolls
+2. estimate movement against the last accepted frame
+3. reject unchanged, reverse, or low-confidence frames
+4. accept the frame only when enough new downward content was revealed
 
-The estimator is the authority. A requested scroll that produces no real motion should not advance the stitcher.
+The estimator is the authority. Input without confirmed visual movement must
+not advance the stitcher.
 
 ### 4. Frame acceptance
 
@@ -327,39 +329,30 @@ Auto-scroll is the mode.
 Flow:
 
 1. user selects region
-2. Snapper identifies the scroll target near the region center
-3. Snapper issues a scroll step
-4. the estimator confirms real movement
-5. Snapper appends newly revealed content
-6. Snapper issues the next step
-7. Snapper stops when the end is reached or retries are exhausted
+2. capture identifies and activates the application beneath the region center
+3. user scrolls with their normal wheel or trackpad
+4. the estimator confirms real downward movement
+5. capture appends newly revealed content
+6. user chooses Close, Edit, Keep on Page, OCR, or Copy when finished
 
 Key rule:
 
-The estimator is authoritative. Do not assume a requested AX or wheel event produced motion.
+The estimator is authoritative. Do not assume input produced useful downward motion.
 
 ### Target discovery
 
-Try, in order:
-
-1. Accessibility element at the region center
-2. nearest ancestor with scroll actions or scroll bar attributes
-3. synthetic wheel events delivered at the selected point
-
-This means:
-
-- native apps may auto-scroll cleanly through AX
-- browsers and Electron apps may work through wheel events even when AX metadata is weak
+Resolve the frontmost normal window beneath the region center and bring its
+owning application forward. Do not guess a nested scroll container or inject
+events into it; the user's pointer location and real scroll gesture determine
+which container moves.
 
 ### Failure handling
 
-If auto-scroll fails to produce confident motion after a few attempts:
+If manual scrolling does not produce confident downward motion:
 
-- stop the session
-- preserve any valid stitched result if there is one
-- show a short explanation such as `Couldn’t control this scroll area reliably`
-
-There should be no fallback into manual scrolling.
+- keep recording without appending ambiguous frames
+- preserve every valid strip already stitched
+- let the user choose a result action or continue scrolling more slowly
 
 ## UI Integration
 
@@ -367,11 +360,11 @@ There should be no fallback into manual scrolling.
 
 Update:
 
-- `Snapper/Capture/CaptureMode.swift`
-- `Snapper/Capture/CaptureCoordinator.swift`
-- `Snapper/Capture/AllInOneHUD/AllInOneHUDView.swift`
-- `Snapper/MenuBar/MenuBarMenu.swift`
-- `Snapper/Hotkeys/HotkeyAction.swift`
+- `capture/Capture/CaptureMode.swift`
+- `capture/Capture/CaptureCoordinator.swift`
+- `capture/Capture/AllInOneHUD/AllInOneHUDView.swift`
+- `capture/MenuBar/MenuBarMenu.swift`
+- `capture/Hotkeys/HotkeyAction.swift`
 
 Add a new menu item and HUD button for `Scroll`.
 
@@ -379,8 +372,9 @@ Add a new menu item and HUD button for `Scroll`.
 
 Add a small floating controller with:
 
-- `Stop`
-- `Pause`
+- `Close`, `Edit`, `Keep on Page`, `OCR`, and `Copy`, in that order
+- Copy as the emphasized rightmost commit action
+- Close as cancellation without clipboard output
 - live status such as `Scrolling...`, `Retrying...`, or `Reached end`
 - an optional progress hint based on cumulative stitched height
 
@@ -396,23 +390,23 @@ History should store `captureType = scroll`.
 
 ### Existing files to extend
 
-- `Snapper/Capture/CaptureMode.swift`
-- `Snapper/Capture/CaptureCoordinator.swift`
-- `Snapper/Capture/ScreenCaptureService.swift`
-- `Snapper/App/AppState.swift`
-- `Snapper/App/Constants.swift`
-- `Snapper/Settings/SettingsView.swift`
-- `Snapper/History/Models/CaptureRecord.swift`
+- `capture/Capture/CaptureMode.swift`
+- `capture/Capture/CaptureCoordinator.swift`
+- `capture/Capture/ScreenCaptureService.swift`
+- `capture/App/AppState.swift`
+- `capture/App/Constants.swift`
+- `capture/Settings/SettingsView.swift`
+- `capture/History/Models/CaptureRecord.swift`
 
 ### New files to add
 
-- `Snapper/Capture/ScrollCapture/ScrollCaptureCoordinator.swift`
-- `Snapper/Capture/ScrollCapture/ScrollCaptureSession.swift`
-- `Snapper/Capture/ScrollCapture/ScrollCaptureRecorder.swift`
-- `Snapper/Capture/ScrollCapture/ScrollMotionEstimator.swift`
-- `Snapper/Capture/ScrollCapture/ScrollStitcher.swift`
-- `Snapper/Capture/ScrollCapture/ScrollCaptureControlPanel.swift`
-- `Snapper/Capture/ScrollCapture/AutoScroller.swift`
+- `capture/Capture/ScrollCapture/ScrollCaptureCoordinator.swift`
+- `capture/Capture/ScrollCapture/ScrollCaptureSession.swift`
+- `capture/Capture/ScrollCapture/ScrollCaptureRecorder.swift`
+- `capture/Capture/ScrollCapture/ScrollMotionEstimator.swift`
+- `capture/Capture/ScrollCapture/ScrollStitcher.swift`
+- `capture/Capture/ScrollCapture/ScrollCaptureControlPanel.swift`
+- `capture/Capture/ScrollCapture/AutoScroller.swift` (historical filename containing target resolution)
 
 Keep the estimator and stitcher mostly free of AppKit UI dependencies so they can be tested in isolation.
 
@@ -423,7 +417,7 @@ Avoid too many knobs in the first version.
 The only settings worth exposing early are:
 
 - whether to open the editor automatically after completion
-- whether Snapper should prefer AX scrolling before synthetic wheel events
+- no scrolling method setting; scrolling is always direct user input
 
 Keep frame rate, confidence thresholds, overlap search ranges, and memory budgets internal until real-world testing proves they need to be user-facing.
 
@@ -464,14 +458,15 @@ Check:
 Build Phase 1 as:
 
 - area-based
-- auto-scrolled
+- manually scrolled
 - video-driven
 - vertical-only stitching
 
 The critical implementation bet is a verified control loop:
 
-1. issue scroll input
-2. confirm actual motion from the video stream
+1. observe the user's scroll input through the video stream
+2. confirm actual downward motion
 3. stitch only confirmed new content
 
-That keeps the feature app-agnostic while still delivering the fully automatic behavior the product wants.
+That keeps the feature app-agnostic and honest about the browser behavior it
+can reliably support.

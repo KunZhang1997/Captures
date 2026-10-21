@@ -4,8 +4,8 @@ set -euo pipefail
 
 VERSION="${1:?usage: verify-release-artifacts.sh VERSION [ARTIFACT_DIRECTORY]}"
 ARTIFACT_DIR="${2:-.}"
-DMG="$ARTIFACT_DIR/Snapper-$VERSION.dmg"
-ZIP="$ARTIFACT_DIR/Snapper-$VERSION.zip"
+DMG="$ARTIFACT_DIR/Captures-$VERSION.dmg"
+ZIP="$ARTIFACT_DIR/Captures-$VERSION.zip"
 WORK_DIR="$(mktemp -d)"
 MOUNT_POINT="$WORK_DIR/dmg"
 MOUNTED=false
@@ -23,7 +23,7 @@ verify_app() {
   local source="$2"
 
   if [ ! -d "$app" ]; then
-    echo "Snapper.app is missing from $source" >&2
+    echo "Captures.app is missing from $source" >&2
     exit 1
   fi
 
@@ -45,15 +45,15 @@ test -f "$ZIP"
 
 mkdir -p "$WORK_DIR/zip"
 ditto -x -k "$ZIP" "$WORK_DIR/zip"
-verify_app "$WORK_DIR/zip/Snapper.app" "the ZIP"
+verify_app "$WORK_DIR/zip/Captures.app" "the ZIP"
 
 mkdir -p "$MOUNT_POINT"
 hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT_POINT" "$DMG" >/dev/null
 MOUNTED=true
-verify_app "$MOUNT_POINT/Snapper.app" "the DMG"
+verify_app "$MOUNT_POINT/Captures.app" "the DMG"
 
-if [ -f "$ARTIFACT_DIR/Snapper-latest.dmg" ]; then
-  cmp "$DMG" "$ARTIFACT_DIR/Snapper-latest.dmg"
+if [ -f "$ARTIFACT_DIR/Captures-latest.dmg" ]; then
+  cmp "$DMG" "$ARTIFACT_DIR/Captures-latest.dmg"
 fi
 
-echo "Verified signed and notarized Snapper $VERSION release artifacts."
+echo "Verified signed and notarized Captures $VERSION release artifacts."

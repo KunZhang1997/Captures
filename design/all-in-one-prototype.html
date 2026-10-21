@@ -1,0 +1,3314 @@
+<!doctype html>
+<!--
+  Captures prototype source of truth.
+      Every future capture prototype belongs in this file as an in-page mode or
+      state. Do not create a sibling prototype HTML file; extend this document,
+      preserve its Apple-native visual language, and keep the interaction real.
+      Capture rectangles must be drawn by the user; never replace them with a
+      hard-coded default rectangle.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Captures · All in One 原型</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d1d1f;
+      --secondary: #6e6e73;
+      --selection-corner: rgba(31,31,33,.92);
+      --selection-corner-contrast: rgba(255,255,255,.96);
+      --tertiary: #86868b;
+      --surface: rgba(255, 255, 255, 0.82);
+      --surface-strong: rgba(255, 255, 255, 0.94);
+      --line: rgba(29, 29, 31, 0.14);
+      --line-strong: rgba(29, 29, 31, 0.22);
+      --blue: #007aff;
+      --blue-soft: rgba(0, 122, 255, 0.12);
+      --green: #34c759;
+      --prototype-switcher-height: 52px;
+      --titlebar-height: 40px;
+      --frame-left: 7.3%;
+      --frame-top: 8.5%;
+      --frame-width: 85.4%;
+      --frame-height: 76%;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { width: 100%; min-width: 0; height: 100%; min-height: 0; overflow: hidden; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      background: #f5f5f7;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button { font: inherit; }
+
+    .prototype {
+      width: 100%;
+      height: calc(100vh - var(--prototype-switcher-height));
+      flex: 1 1 auto;
+      min-height: 0;
+      margin: 0;
+      position: relative;
+      overflow: hidden;
+      border: 0;
+      border-radius: 0;
+      background: #f5f5f7;
+      box-shadow: none;
+    }
+
+    .prototype-switcher-bar {
+      flex: 0 0 var(--prototype-switcher-height);
+      height: var(--prototype-switcher-height);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+      border-bottom: 1px solid rgba(29,29,31,.10);
+      background: rgba(245,245,247,.96);
+    }
+
+    .desktop-bar {
+      height: var(--titlebar-height);
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 12px;
+      position: relative;
+      z-index: 40;
+      padding: 0 14px;
+      color: rgba(29,29,31,.68);
+      font-size: 11px;
+      border-bottom: 1px solid rgba(29,29,31,.08);
+      background: rgba(248,248,250,.92);
+      backdrop-filter: blur(18px) saturate(125%);
+      -webkit-backdrop-filter: blur(18px) saturate(125%);
+    }
+
+    .desktop-left { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; }
+    .desktop-app { color: var(--ink); font-size: 11px; font-weight: 600; }
+
+    .traffic-lights { display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; }
+    .traffic-lights i { width: 12px; height: 12px; display: block; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); }
+    .traffic-lights i:nth-child(1) { background: #ff5f57; }
+    .traffic-lights i:nth-child(2) { background: #febc2e; }
+    .traffic-lights i:nth-child(3) { background: #28c840; }
+
+    .mode-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 1px;
+      padding: 3px;
+      border: 1px solid rgba(29,29,31,.11);
+      border-radius: 10px;
+      background: rgba(118,118,128,.10);
+      box-shadow: 0 1px 0 rgba(255,255,255,.64) inset;
+    }
+
+    .mode-switch button {
+      min-width: 96px;
+      min-height: 26px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--secondary);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: -.01em;
+      transition: background .16s ease, color .16s ease, box-shadow .16s ease, transform .16s ease;
+    }
+
+    .mode-switch button:hover:not([aria-selected="true"]) { background: rgba(255,255,255,.42); color: var(--ink); }
+    .mode-switch button:active { transform: scale(.985); }
+    .mode-switch button[aria-selected="true"] {
+      background: rgba(255,255,255,.96);
+      color: var(--ink);
+      box-shadow: 0 1px 3px rgba(29,29,31,.14), 0 0 0 .5px rgba(29,29,31,.07);
+    }
+
+    .mode-switch button:focus-visible,
+    .editor-command-tabs button:focus-visible,
+    .editor-action:focus-visible {
+      outline: 3px solid rgba(0,122,255,.28);
+      outline-offset: 1px;
+    }
+
+    .prototype-nav { display: none; }
+
+    .scene {
+      position: absolute;
+      inset: var(--titlebar-height) 0 0;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .editor-workspace,
+    .scroll-workspace,
+    .pin-workspace {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(5px) scale(.998);
+      transform-origin: 50% 46%;
+      z-index: 1;
+    }
+
+    .prototype[data-ready="true"] .editor-workspace,
+    .prototype[data-ready="true"] .scroll-workspace,
+    .prototype[data-ready="true"] .pin-workspace {
+      transition:
+        opacity .14s ease,
+        transform .18s cubic-bezier(.2,.8,.2,1),
+        visibility 0s linear 0s;
+    }
+
+    .editor-workspace {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: #f5f5f7;
+    }
+
+    .scroll-workspace {
+      display: block;
+    }
+
+    .pin-workspace {
+      display: block;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 16%, rgba(0,122,255,.13), transparent 30%),
+        linear-gradient(145deg, #e8edf5 0%, #dce3ed 48%, #d4dbe5 100%);
+    }
+
+    #prototype[data-page="editor"] [data-page-pane="editor"],
+    #prototype[data-page="scroll"] [data-page-pane="scroll"],
+    #prototype[data-page="pin"] [data-page-pane="pin"] {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+      transition-delay: 0s;
+      z-index: 2;
+    }
+
+    .editor-action-template { display: none; }
+
+    .editor-command-slot {
+      flex: 1 1 auto;
+      align-self: stretch;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    #prototype:not([data-page="editor"]) .editor-command-slot { display: none; }
+
+    .editor-command-bar {
+      height: var(--titlebar-height);
+      align-items: center;
+      display: flex;
+      min-width: 0;
+      gap: 8px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .editor-command-tabs,
+    .editor-command-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .editor-command-actions { flex: 0 0 auto; margin-left: auto; }
+
+    .editor-command-tabs {
+      gap: 3px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .editor-zoom-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 1px;
+      margin-right: 4px;
+      padding-right: 7px;
+      border-right: 1px solid rgba(29,29,31,.12);
+    }
+
+    .editor-command-tabs button {
+      height: 27px;
+      min-width: 58px;
+      padding: 0 9px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--secondary);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+    }
+
+    .editor-command-tabs button:hover:not([aria-selected="true"]) { background: rgba(255,255,255,.46); color: var(--ink); }
+    .editor-command-tabs button[aria-selected="true"] {
+      background: rgba(255,255,255,.96);
+      color: var(--ink);
+      box-shadow: 0 1px 3px rgba(29,29,31,.12), 0 0 0 .5px rgba(29,29,31,.06);
+    }
+
+    .editor-command-divider { width: 1px; height: 18px; margin: 0 4px; background: rgba(29,29,31,.12); }
+
+    .editor-action {
+      min-height: 26px;
+      padding: 0 7px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: #007aff;
+      cursor: pointer;
+      font-size: 9px;
+      white-space: nowrap;
+      transition: background .15s ease, border-color .15s ease, transform .15s ease;
+    }
+
+    .editor-action:hover { background: rgba(0,122,255,.09); }
+    .editor-action:active { transform: scale(.98); }
+    .editor-action.subtle { color: var(--secondary); }
+    .editor-action.primary { padding: 0 10px; background: #007aff; color: #fff; }
+    .editor-action.primary:hover { background: #168cff; }
+    .editor-action.icon { min-width: 24px; padding: 0 5px; font-size: 15px; line-height: 1; }
+    .editor-action.fit { padding: 0 6px; color: var(--secondary); }
+
+    .editor-host {
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
+      position: relative;
+      padding: 0;
+    }
+
+    .editor-shell {
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .editor-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 0;
+      color: var(--secondary);
+      background: #f5f5f7;
+      font-size: 12px;
+      pointer-events: none;
+      transition: opacity .18s ease;
+    }
+
+    .editor-host:has(> .FIE_root) .editor-loading { opacity: 0; }
+
+    .editor-host > .FIE_root {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .editor-toast {
+      position: absolute;
+      left: 50%;
+      bottom: 22px;
+      z-index: 30;
+      transform: translate(-50%, 10px);
+      padding: 8px 12px;
+      border-radius: 9px;
+      background: rgba(29,29,31,.84);
+      color: #fff;
+      font-size: 11px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .editor-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+    .source-window {
+      position: absolute;
+      inset: 26px 30px 112px;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid rgba(29,29,31,.16);
+      background: #fff;
+      box-shadow: 0 12px 36px rgba(30,38,52,.14);
+    }
+
+    .source-page {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .source-page img {
+      display: block;
+      width: 100%;
+      height: auto;
+      transform: translateY(0);
+      transition: transform 110ms ease-out;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .page-chrome {
+      height: 34px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      background: rgba(255,255,255,.76);
+      border-bottom: 1px solid rgba(29,29,31,.08);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      color: var(--tertiary);
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    .page-chrome .traffic-lights { display: flex; gap: 5px; margin-right: 4px; }
+    .page-chrome .traffic-lights i { width: 8px; height: 8px; border-radius: 50%; display: block; }
+    .page-chrome .traffic-lights i:nth-child(1) { background: #ff5f57; }
+    .page-chrome .traffic-lights i:nth-child(2) { background: #febc2e; }
+    .page-chrome .traffic-lights i:nth-child(3) { background: #28c840; }
+    .address-pill {
+      min-width: 260px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      border-radius: 7px;
+      background: rgba(29,29,31,.06);
+      color: rgba(29,29,31,.5);
+    }
+
+    .selection-dim {
+      position: absolute;
+      z-index: 5;
+      inset: 0;
+      pointer-events: none;
+      /* The selection window's outside box-shadow is the mask. Keeping a
+         second full-screen fill here would dim the captured content twice. */
+      background: transparent;
+      opacity: 0;
+      transition: opacity .25s ease;
+    }
+
+    .selection-window {
+      position: absolute;
+      z-index: 6;
+      left: var(--frame-left);
+      top: var(--frame-top);
+      width: var(--frame-width);
+      height: var(--frame-height);
+      border: 0;
+      border-radius: 9px;
+      box-shadow: 0 0 0 9999px rgba(17,21,28,.34);
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: box-shadow .25s ease, opacity .18s ease;
+    }
+
+    .source-window.has-selection .selection-window {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .source-window:not(.has-selection) { cursor: crosshair; }
+    .source-window.is-dragging { cursor: crosshair; }
+
+    .selection-window.done { box-shadow: 0 0 0 9999px rgba(17,21,28,.2); }
+
+    /* Four transparent pointer shields cover only the dimmed surroundings.
+       The center remains open so manual scrolling can reach the selected page. */
+    .scroll-input-shield {
+      position: absolute;
+      z-index: 5;
+      display: none;
+      background: transparent;
+      pointer-events: auto;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .corner {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      pointer-events: none;
+    }
+    .corner svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      shape-rendering: geometricPrecision;
+    }
+    .corner path {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+    .corner .corner-contrast { stroke: var(--selection-corner-contrast); stroke-width: 8; }
+    .corner .corner-primary { stroke: var(--selection-corner); stroke-width: 6; }
+    .corner.tl { left: -4px; top: -4px; }
+    .corner.tr { right: -4px; top: -4px; transform: scaleX(-1); }
+    .corner.bl { left: -4px; bottom: -4px; transform: scaleY(-1); }
+    .corner.br { right: -4px; bottom: -4px; transform: scale(-1); }
+
+    .frame-caption {
+      position: absolute;
+      left: 12px;
+      top: -31px;
+      display: none;
+      align-items: center;
+      gap: 7px;
+      height: 24px;
+      padding: 0 9px;
+      border-radius: 7px;
+      background: rgba(29,29,31,.86);
+      color: #fff;
+      font-size: 11px;
+      letter-spacing: .01em;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    }
+
+    .frame-caption .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+    .capturing .frame-caption .dot { animation: pulse 1.3s ease-in-out infinite; }
+    .done .frame-caption .dot { background: #36c66b; animation: none; }
+    @keyframes pulse { 0%,100% { opacity: .35; transform: scale(.78); } 50% { opacity: 1; transform: scale(1); } }
+
+    .selection-hint {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      z-index: 7;
+      transform: translate(-50%, -50%);
+      padding: 11px 16px;
+      border-radius: 11px;
+      background: rgba(29,29,31,.82);
+      color: #fff;
+      font-size: 13px;
+      letter-spacing: .01em;
+      box-shadow: 0 8px 24px rgba(0,0,0,.18);
+      transition: opacity .2s ease, transform .2s ease;
+      pointer-events: none;
+    }
+
+    .has-selection .selection-hint, .capturing .selection-hint, .done .selection-hint { opacity: 0; transform: translate(-50%, -45%); }
+
+    .control-panel {
+      position: absolute;
+      z-index: 12;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+      width: min(690px, calc(100% - 72px));
+      padding: 12px 14px 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border: 1px solid rgba(255,255,255,.76);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: 0 12px 36px rgba(30,38,52,.2), 0 1px 0 rgba(255,255,255,.85) inset;
+      backdrop-filter: blur(24px) saturate(130%);
+      -webkit-backdrop-filter: blur(24px) saturate(130%);
+    }
+
+    .panel-main { min-width: 0; flex: 1; }
+    .panel-eyebrow { display: flex; align-items: center; gap: 7px; color: var(--secondary); font-size: 11px; margin-bottom: 3px; }
+    .panel-eyebrow .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
+    .done .panel-eyebrow .live-dot { background: var(--green); }
+    .panel-title { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+    .panel-subtitle { margin-top: 3px; color: var(--secondary); font-size: 12px; }
+    .panel-subtitle strong { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+    .panel-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    #prototype[data-state="capturing"] #startButton,
+    #prototype[data-state="done"] #startButton { display: none; }
+    #prototype[data-state="capturing"] .scroll-workspace > .control-panel,
+    #prototype[data-state="done"] .scroll-workspace > .control-panel { display: none; }
+    .action {
+      min-height: 34px;
+      padding: 0 13px;
+      border: 1px solid rgba(29,29,31,.14);
+      border-radius: 10px;
+      background: rgba(255,255,255,.56);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: background .15s ease, transform .15s ease, border-color .15s ease;
+    }
+    .action:hover { background: rgba(255,255,255,.9); border-color: rgba(29,29,31,.23); }
+    .action:active { transform: scale(.98); }
+    .action:disabled { cursor: not-allowed; opacity: .48; box-shadow: none; }
+    .action.primary { color: #fff; border-color: transparent; background: var(--blue); box-shadow: 0 2px 5px rgba(0,113,227,.2); }
+    .action.primary:hover { background: #0077ed; }
+    .action.ghost { display: none; }
+    .capturing .action.start, .done .action.start { display: none; }
+    .capturing .action.ghost { display: inline-flex; align-items: center; }
+    .done .action.ghost { display: none; }
+    .done .action.primary { background: rgba(29,29,31,.08); color: var(--ink); box-shadow: none; }
+
+    .state-legend {
+      position: absolute;
+      z-index: 11;
+      top: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      gap: 7px;
+      padding: 5px;
+      border: 1px solid rgba(255,255,255,.7);
+      border-radius: 10px;
+      background: rgba(255,255,255,.62);
+      box-shadow: 0 5px 20px rgba(30,38,52,.1);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .state-legend button {
+      border: 0;
+      padding: 5px 9px;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--secondary);
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .state-legend button.active { background: rgba(255,255,255,.9); color: var(--ink); box-shadow: 0 1px 3px rgba(29,29,31,.1); }
+
+    .helper {
+      position: absolute;
+      left: 30px;
+      bottom: 30px;
+      z-index: 2;
+      color: rgba(29,29,31,.42);
+      font-size: 11px;
+    }
+
+    .pin-stage {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .pin-source {
+      position: absolute;
+      inset: 42px 11% 82px;
+      overflow: hidden;
+      border: 1px solid rgba(29,29,31,.15);
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 16px 42px rgba(35,46,64,.18);
+    }
+
+    .pin-source img {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 9%;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .pin-source-chrome {
+      position: absolute;
+      inset: 0 0 auto;
+      z-index: 1;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      padding: 0 11px;
+      background: rgba(255,255,255,.76);
+      border-bottom: 1px solid rgba(29,29,31,.08);
+      color: rgba(29,29,31,.48);
+      font-size: 11px;
+      pointer-events: none;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .pin-selection {
+      position: absolute;
+      z-index: 7;
+      display: none;
+      border: 0;
+      border-radius: 9px;
+      box-shadow: 0 0 0 9999px rgba(20,26,35,.30);
+      pointer-events: none;
+    }
+
+    .pin-workspace.is-selecting .pin-source { cursor: crosshair; }
+    .pin-workspace.is-selecting .floating-capture { pointer-events: none; opacity: .26; }
+    .pin-workspace.is-selecting .pin-selection.is-visible { display: block; }
+
+    .pin-selection.is-committed {
+      display: block;
+      box-shadow: 0 0 0 9999px rgba(20,26,35,.27);
+    }
+
+    .post-capture-chooser[hidden] { display: none; }
+
+    .post-capture-chooser {
+      --chooser-lens-x: 3px;
+      --chooser-lens-opacity: 0;
+      position: absolute;
+      z-index: 42;
+      width: 135px;
+      height: 34px;
+      padding: 3px;
+      display: grid;
+      grid-template-columns: repeat(4, 30px);
+      gap: 3px;
+      overflow: visible;
+      border: 1px solid rgba(29,29,31,.24);
+      border-radius: 12px;
+      background: rgba(248,249,251,.92);
+      box-shadow:
+        0 12px 28px rgba(15,23,34,.24),
+        0 1px 0 rgba(255,255,255,.95) inset,
+        0 0 0 1px rgba(29,29,31,.08);
+      backdrop-filter: blur(22px) saturate(135%);
+      -webkit-backdrop-filter: blur(22px) saturate(135%);
+      opacity: 0;
+      transform: translateY(4px) scale(.96);
+      transform-origin: 82% 0;
+      transition:
+        opacity .14s ease,
+        transform .2s cubic-bezier(.2,.85,.2,1);
+      isolation: isolate;
+    }
+
+    .post-capture-chooser.has-scroll-capture {
+      width: 168px;
+      grid-template-columns: repeat(5, 30px);
+    }
+
+    .post-capture-chooser.scroll-result-chooser {
+      width: 168px;
+      grid-template-columns: repeat(5, 30px);
+    }
+
+    .post-capture-chooser.area-result-chooser {
+      width: max-content;
+      max-width: calc(100% - 20px);
+      height: auto;
+      min-height: 34px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      border-radius: 12px;
+    }
+
+    .area-result-chooser::before { display: none; }
+    .post-capture-chooser.area-result-chooser[hidden] { display: none; }
+    .area-result-chooser .post-capture-action { flex: 0 0 30px; }
+    .area-result-chooser .post-capture-action:is(:hover, :focus-visible, [aria-pressed="true"]) {
+      background: rgba(10,132,255,.12);
+      box-shadow: 0 1px 4px rgba(29,29,31,.18);
+    }
+    .area-result-chooser .post-capture-action[aria-pressed="true"] {
+      outline: 1px solid rgba(10,132,255,.56);
+      outline-offset: -1px;
+    }
+    .area-result-chooser .post-capture-action:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+    .quick-markup-results { display: flex; gap: 3px; align-items: center; margin-left: auto; }
+    .quick-markup-message { flex-basis: 100%; padding: 3px 7px 5px; color: var(--ink); font-size: 12px; line-height: 1.4; }
+    .quick-markup-message[hidden] { display: none; }
+    .quick-markup-divider { width: 1px; height: 18px; margin: 0 3px; background: rgba(29,29,31,.28); }
+    .quick-markup-color { width: 28px; height: 26px; padding: 3px; border: 0; background: transparent; cursor: pointer; }
+    .quick-markup-width { width: 48px; height: 28px; border: 0; border-radius: 7px; background: transparent; font: 11px -apple-system, BlinkMacSystemFont, sans-serif; color: #1d1d1f; }
+    .quick-markup-canvas { position: absolute; z-index: 6; touch-action: none; }
+    .quick-markup-canvas[hidden], .quick-markup-text[hidden] { display: none; }
+    .quick-markup-text { position: absolute; z-index: 40; min-width: 100px; min-height: 34px; padding: 4px 6px; resize: both; border: 1px solid #007aff; border-radius: 5px; background: rgba(255,255,255,.95); color: #1d1d1f; font: 20px -apple-system, BlinkMacSystemFont, sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      .area-result-chooser { background: rgba(44,44,46,.96); border-color: rgba(255,255,255,.34); }
+      .area-result-chooser .post-capture-action svg { stroke: #f5f5f7; }
+      .area-result-chooser .post-capture-action img { filter: invert(1); }
+      .area-result-chooser .post-capture-action:is(:hover, :focus-visible, [aria-pressed="true"]) { background: rgba(10,132,255,.28); }
+      .area-result-chooser .post-capture-action[aria-pressed="true"] { outline-color: rgba(10,132,255,.78); }
+      .quick-markup-divider { background: rgba(255,255,255,.32); }
+      .quick-markup-width { color: #f5f5f7; }
+    }
+    @media (prefers-reduced-transparency: reduce) { .area-result-chooser { backdrop-filter: none; -webkit-backdrop-filter: none; background: #f7f7f9; border-color: #8d8d93; } }
+    @media (prefers-color-scheme: dark) and (prefers-reduced-transparency: reduce) { .area-result-chooser { background: #2c2c2e; border-color: #b0b0b5; } }
+    @media (prefers-contrast: more) { .area-result-chooser { border: 1px solid currentColor; } .area-result-chooser .post-capture-action[aria-pressed="true"] { outline: 2px solid currentColor; } }
+
+    .post-capture-chooser.is-visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .scroll-live-preview[hidden] { display: none; }
+
+    .scroll-live-preview {
+      position: absolute;
+      z-index: 41;
+      width: 60px;
+      min-height: 46px;
+      max-height: 260px;
+      padding: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 12px;
+      background: rgba(236,240,244,.56);
+      box-shadow:
+        0 9px 26px rgba(15,23,34,.18),
+        0 1px 0 rgba(255,255,255,.82) inset,
+        0 0 0 .5px rgba(29,29,31,.12);
+      backdrop-filter: blur(22px) saturate(145%);
+      -webkit-backdrop-filter: blur(22px) saturate(145%);
+      opacity: 0;
+      transform: translateY(4px) scale(.96);
+      transform-origin: 100% 0;
+      transition:
+        height .18s cubic-bezier(.2,.85,.2,1),
+        opacity .14s ease,
+        transform .2s cubic-bezier(.2,.85,.2,1);
+      pointer-events: none;
+      isolation: isolate;
+    }
+
+    .scroll-live-preview.is-visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .scroll-live-preview img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+      object-fit: cover;
+      object-position: center top;
+      opacity: .8;
+      filter: saturate(.82) contrast(.92);
+    }
+
+    .scroll-live-indicator {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 8px;
+      height: 8px;
+      border: 1px solid rgba(255,255,255,.9);
+      border-radius: 50%;
+      background: #30d158;
+      box-shadow: 0 1px 4px rgba(0,0,0,.28);
+    }
+
+    .post-capture-chooser::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      top: 3px;
+      left: var(--chooser-lens-x);
+      width: 30px;
+      height: 28px;
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 9px;
+      background: rgba(255,255,255,.42);
+      box-shadow:
+        0 2px 7px rgba(25,35,48,.11),
+        0 1px 0 rgba(255,255,255,.78) inset;
+      opacity: var(--chooser-lens-opacity);
+      transition:
+        left .18s cubic-bezier(.2,.82,.2,1),
+        opacity .12s ease,
+        transform .12s ease;
+    }
+
+    .post-capture-chooser:has(.post-capture-action:nth-child(1):is(:hover, :focus-visible)) {
+      --chooser-lens-x: 3px;
+      --chooser-lens-opacity: 1;
+    }
+
+    .post-capture-chooser:has(.post-capture-action:nth-child(2):is(:hover, :focus-visible)) {
+      --chooser-lens-x: 36px;
+      --chooser-lens-opacity: 1;
+    }
+
+    .post-capture-chooser:has(.post-capture-action:nth-child(3):is(:hover, :focus-visible)) {
+      --chooser-lens-x: 69px;
+      --chooser-lens-opacity: 1;
+    }
+
+    .post-capture-chooser:has(.post-capture-action:nth-child(4):is(:hover, :focus-visible)) {
+      --chooser-lens-x: 102px;
+      --chooser-lens-opacity: 1;
+    }
+
+    .post-capture-chooser:has(.post-capture-action:nth-child(5):is(:hover, :focus-visible)) {
+      --chooser-lens-x: 135px;
+      --chooser-lens-opacity: 1;
+    }
+
+    .post-capture-chooser:has(.post-capture-action:nth-child(6):is(:hover, :focus-visible)) {
+      --chooser-lens-x: 168px;
+      --chooser-lens-opacity: 1;
+    }
+
+    .post-capture-action {
+      position: relative;
+      z-index: 1;
+      width: 30px;
+      height: 28px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform .12s ease, opacity .12s ease;
+    }
+
+    .post-capture-action:hover { transform: translateY(-.5px); }
+    .post-capture-action:active { transform: scale(.9); }
+    .post-capture-action:focus-visible {
+      outline: 2px solid rgba(10,132,255,.52);
+      outline-offset: 1px;
+    }
+
+    .post-capture-action img {
+      display: block;
+      width: 18px;
+      height: 18px;
+      object-fit: contain;
+      opacity: .96;
+      pointer-events: none;
+    }
+
+    .post-capture-action svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: rgba(29,29,31,.94);
+      stroke-width: 1.85;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .scroll-result-chooser .post-capture-action.is-cancel svg {
+      stroke: rgba(29,29,31,.78);
+    }
+
+    .scroll-result-chooser .post-capture-action:disabled {
+      cursor: progress;
+      opacity: .38;
+      transform: none;
+    }
+
+    .scroll-result-status {
+      position: absolute;
+      left: 50%;
+      bottom: 28px;
+      z-index: 43;
+      max-width: calc(100% - 48px);
+      padding: 8px 12px;
+      border-radius: 9px;
+      background: rgba(29,29,31,.84);
+      color: #fff;
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 8px);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .scroll-result-status.is-visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .post-capture-action[data-post-capture-action="pin"] img {
+      transform: rotate(-45deg);
+    }
+
+    .pin-workspace.is-choosing .pin-source { cursor: default; }
+    .pin-workspace.is-choosing .floating-capture { pointer-events: none; opacity: .32; }
+    .pin-workspace.is-choosing .pin-dock {
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 5px);
+    }
+
+    .floating-capture {
+      position: absolute;
+      z-index: 10;
+      overflow: hidden;
+      border: 1px solid rgba(29,29,31,.58);
+      border-radius: 4px;
+      background: #fff;
+      box-shadow: 0 10px 26px rgba(22,29,40,.26), 0 1px 2px rgba(0,0,0,.13);
+      touch-action: none;
+    }
+
+    .floating-capture:focus-visible {
+      outline: 3px solid rgba(0,122,255,.42);
+      outline-offset: 2px;
+    }
+
+    .floating-capture__preview {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .floating-capture__preview img {
+      position: absolute;
+      display: block;
+      max-width: none;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .floating-capture__close {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 3;
+      width: 16px;
+      height: 16px;
+      padding: 0;
+      border: 1px solid rgba(137,28,28,.38);
+      border-radius: 50%;
+      background: #ff5f57;
+      color: rgba(88,22,20,.86);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 13px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.18);
+      transition: transform .15s ease, background .15s ease;
+    }
+
+    .floating-capture__close:hover {
+      background: #ff736b;
+      transform: scale(1.08);
+    }
+
+    .floating-capture__preview {
+      cursor: grab;
+    }
+
+    .floating-capture__preview:active { cursor: grabbing; }
+
+    .floating-capture__actions {
+      position: absolute;
+      z-index: 3;
+      top: 6px;
+      right: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .floating-capture__action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 25px;
+      height: 25px;
+      padding: 0;
+      border: 1px solid rgba(255,255,255,.84);
+      border-radius: 7px;
+      background: rgba(255,255,255,.86);
+      box-shadow: 0 2px 7px rgba(18,27,39,.16), 0 1px 0 rgba(255,255,255,.8) inset;
+      color: rgba(29,29,31,.86);
+      cursor: pointer;
+      font: 600 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+      letter-spacing: .01em;
+      backdrop-filter: blur(10px) saturate(125%);
+      -webkit-backdrop-filter: blur(10px) saturate(125%);
+      transition: background .15s ease, box-shadow .15s ease, transform .15s ease;
+    }
+
+    .floating-capture__action svg {
+      width: 12px;
+      height: 12px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.75;
+    }
+
+    .floating-capture__action span { display: none; }
+
+    .floating-capture__action:hover,
+    .floating-capture__action:focus-visible {
+      background: #fff;
+      box-shadow: 0 3px 10px rgba(18,27,39,.22), 0 1px 0 rgba(255,255,255,.9) inset;
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    .floating-capture__action.is-active {
+      color: #075ec7;
+      border-color: rgba(10,132,255,.38);
+      background: rgba(230,243,255,.94);
+    }
+
+    .pin-dock {
+      position: absolute;
+      z-index: 30;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 42px;
+      padding: 5px 6px 5px 13px;
+      border: 1px solid rgba(255,255,255,.82);
+      border-radius: 12px;
+      background: rgba(255,255,255,.76);
+      box-shadow: 0 10px 30px rgba(35,46,64,.17), 0 1px 0 rgba(255,255,255,.9) inset;
+      color: var(--secondary);
+      font-size: 12px;
+      white-space: nowrap;
+      backdrop-filter: blur(18px) saturate(130%);
+      -webkit-backdrop-filter: blur(18px) saturate(130%);
+      transition: opacity .14s ease, transform .18s ease;
+    }
+
+    .pin-dock button {
+      min-height: 30px;
+      padding: 0 11px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--blue);
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .pin-dock button:hover { background: #0077ed; }
+    .pin-dock button:active { transform: scale(.98); }
+
+    @media (max-width: 860px) {
+      .desktop-muted { display: none; }
+      .mode-switch button { min-width: 76px; padding-inline: 8px; }
+      .desktop-bar { gap: 7px; padding-inline: 10px; }
+      .editor-command-bar { overflow-x: auto; scrollbar-width: none; }
+      .editor-command-bar::-webkit-scrollbar { display: none; }
+      .editor-command-tabs,
+      .editor-command-actions { flex: 0 0 auto; }
+      .editor-command-tabs button { min-width: 0; padding-inline: 7px; font-size: 11px; }
+      .source-window { inset: 20px 16px 126px; }
+      .control-panel { width: calc(100% - 32px); bottom: 18px; }
+      .panel-actions { flex-direction: column; align-items: stretch; }
+      .action { white-space: nowrap; }
+      .helper { display: none; }
+      .pin-source { inset: 28px 6% 78px; }
+      .pin-dock { bottom: 16px; }
+      .post-capture-chooser { transform-origin: 100% 0; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --selection-corner: rgba(255,255,255,.96);
+        --selection-corner-contrast: rgba(31,31,33,.92);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .prototype[data-ready="true"] .editor-workspace,
+      .prototype[data-ready="true"] .scroll-workspace,
+      .prototype[data-ready="true"] .pin-workspace,
+      .mode-switch button,
+      .editor-command-tabs button,
+      .editor-action {
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="prototype-switcher-bar" aria-label="原型页面选择">
+    <div class="mode-switch" role="tablist" aria-label="Captures 原型页面">
+      <button type="button" role="tab" aria-selected="true" aria-controls="editorWorkspace" data-page-nav="editor">图片编辑</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="scrollWorkspace" data-page-nav="scroll">滚动捕获</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="pinWorkspace" data-page-nav="pin">挂在页面上</button>
+    </div>
+  </nav>
+
+  <main class="prototype" id="prototype" data-state="select" data-page="editor">
+    <header class="desktop-bar">
+      <div class="desktop-left">
+        <span class="traffic-lights" aria-label="窗口控制"><i></i><i></i><i></i></span>
+        <span class="desktop-app">Captures</span>
+      </div>
+      <div class="editor-command-slot" id="editorCommandSlot" aria-label="图片编辑命令"></div>
+    </header>
+
+    <section class="scene" aria-label="长截屏操作演示">
+      <section class="editor-workspace" id="editorWorkspace" data-page-pane="editor" aria-label="图片编辑">
+        <div class="editor-action-template" id="editorActionTemplate" aria-hidden="true">
+          <div class="editor-command-bar">
+            <div class="editor-command-tabs" role="tablist" aria-label="图片编辑功能">
+              <button type="button" role="tab" aria-selected="false" aria-label="裁剪与旋转：裁剪、旋转和水平垂直翻转" title="裁剪、旋转与水平垂直翻转" data-editor-tab="调整">裁剪旋转</button>
+              <button type="button" role="tab" aria-selected="false" aria-label="精修：亮度、对比度、HSV、模糊和色温" title="亮度、对比度、HSV、模糊与色温" data-editor-tab="精修">精修</button>
+              <button type="button" role="tab" aria-selected="false" aria-label="滤镜库：四十多种滤镜预设" title="四十多种滤镜预设" data-editor-tab="滤镜">滤镜库</button>
+              <button type="button" role="tab" aria-selected="true" aria-label="标注：文字、图片、形状、画笔、直线和箭头" title="文字、图片、形状、画笔、直线与箭头" data-editor-tab="标注">标注</button>
+              <button type="button" role="tab" aria-selected="false" aria-label="水印：文字、颜色、位置和透明度" title="文字、颜色、位置与透明度" data-editor-tab="水印">水印</button>
+              <button type="button" role="tab" aria-selected="false" aria-label="输出尺寸：宽高和比例" title="输出宽高与比例" data-editor-tab="缩放">输出尺寸</button>
+            </div>
+            <div class="editor-command-actions">
+              <div class="editor-zoom-controls" aria-label="画布缩放">
+                <button type="button" class="editor-action subtle icon" data-editor-control="zoom-out" aria-label="缩小">−</button>
+                <button type="button" class="editor-action fit" data-editor-control="fit">适应</button>
+                <button type="button" class="editor-action subtle icon" data-editor-control="zoom-in" aria-label="放大">＋</button>
+              </div>
+              <button type="button" class="editor-action subtle" data-editor-control="reset">刷新</button>
+              <button type="button" class="editor-action subtle" data-editor-control="undo">撤销</button>
+              <button type="button" class="editor-action subtle" data-editor-control="redo">重做</button>
+              <span class="editor-command-divider" aria-hidden="true"></span>
+              <button type="button" class="editor-action" data-editor-action="ocr">文字识别</button>
+              <button type="button" class="editor-action subtle" data-editor-control="save">保存</button>
+              <button type="button" class="editor-action primary" data-editor-action="copy">复制</button>
+            </div>
+          </div>
+        </div>
+        <div class="editor-shell">
+          <div class="editor-host" id="editorHost" aria-label="完整图片编辑器">
+            <div class="editor-loading" id="editorLoading">正在加载编辑器…</div>
+          </div>
+        </div>
+        <div class="editor-toast" id="editorToast" role="status" aria-live="polite"></div>
+      </section>
+
+      <div class="scroll-workspace" id="scrollWorkspace" data-page-pane="scroll">
+        <div class="source-window" id="sourceWindow">
+        <div class="source-page" id="sourcePage">
+          <img id="sourceImage" src="scroll-capture-reference.png" alt="用于演示长截屏滚动的虚构示例页面" />
+        </div>
+        <div class="page-chrome" aria-hidden="true">
+          <span class="traffic-lights"><i></i><i></i><i></i></span>
+          <span class="address-pill">正在截取当前滚动区域</span>
+          <span>↗</span>
+        </div>
+        <div class="selection-dim"></div>
+        <div class="scroll-input-shield" data-scroll-input-shield="top" aria-hidden="true"></div>
+        <div class="scroll-input-shield" data-scroll-input-shield="bottom" aria-hidden="true"></div>
+        <div class="scroll-input-shield" data-scroll-input-shield="left" aria-hidden="true"></div>
+        <div class="scroll-input-shield" data-scroll-input-shield="right" aria-hidden="true"></div>
+        <div class="selection-window" id="selectionWindow">
+          <span class="corner tl"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="corner-contrast" d="M4 22V10A6 6 0 0 1 10 4H22"/><path class="corner-primary" d="M4 22V10A6 6 0 0 1 10 4H22"/></svg></span>
+          <span class="corner tr"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="corner-contrast" d="M4 22V10A6 6 0 0 1 10 4H22"/><path class="corner-primary" d="M4 22V10A6 6 0 0 1 10 4H22"/></svg></span>
+          <span class="corner bl"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="corner-contrast" d="M4 22V10A6 6 0 0 1 10 4H22"/><path class="corner-primary" d="M4 22V10A6 6 0 0 1 10 4H22"/></svg></span>
+          <span class="corner br"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="corner-contrast" d="M4 22V10A6 6 0 0 1 10 4H22"/><path class="corner-primary" d="M4 22V10A6 6 0 0 1 10 4H22"/></svg></span>
+          <span class="frame-caption"><span class="dot"></span><span id="frameCaption">已选区域</span></span>
+        </div>
+        <div class="post-capture-chooser has-scroll-capture scroll-result-chooser" id="scrollCaptureChooser" role="toolbar" aria-label="完成长截屏并选择下一步" hidden>
+          <button type="button" class="post-capture-action is-cancel" data-scroll-capture-action="cancel" aria-label="关闭长截屏，不保存或复制">
+            <svg viewBox="0 0 18 18" aria-hidden="true">
+              <path d="M5 5l8 8M13 5l-8 8"></path>
+            </svg>
+          </button>
+          <button type="button" class="post-capture-action" data-scroll-capture-action="edit" aria-label="在编辑器中打开长截屏">
+            <svg viewBox="0 0 18 18" aria-hidden="true">
+              <path d="M4 13.5l.7-3 7.7-7.7a1.35 1.35 0 0 1 1.9 0l.9.9a1.35 1.35 0 0 1 0 1.9l-7.7 7.7-3 .7z"></path>
+              <path d="M11.4 3.8l2.8 2.8"></path>
+            </svg>
+          </button>
+          <button type="button" class="post-capture-action" data-scroll-capture-action="ocr" aria-label="识别长截屏文字">
+            <svg viewBox="0 0 18 18" aria-hidden="true">
+              <path d="M3 6V3h3M12 3h3v3M15 12v3h-3M6 15H3v-3"></path>
+              <path d="M6 7h6M9 7v5"></path>
+            </svg>
+          </button>
+          <button type="button" class="post-capture-action" data-scroll-capture-action="save" aria-label="完成并下载长截屏">
+            <svg viewBox="0 0 18 18" aria-hidden="true">
+              <path d="M9 3v8M6 8l3 3 3-3M4 14h10"></path>
+            </svg>
+          </button>
+          <button type="button" class="post-capture-action" data-scroll-capture-action="copy" aria-label="完成并复制长截屏">
+            <img src="post-capture-icons/copy.png" alt="" />
+          </button>
+        </div>
+        <div class="scroll-live-preview" id="scrollCapturePreview" role="img" aria-label="长截屏实时预览；捕获内容越多，预览会随之变长" hidden>
+          <img id="scrollCapturePreviewImage" src="scroll-capture-reference.png" alt="" />
+          <span class="scroll-live-indicator" aria-hidden="true"></span>
+        </div>
+        <div class="scroll-result-status" id="scrollResultStatus" role="status" aria-live="polite"></div>
+        <div class="selection-hint">在屏幕上拖动，框出要连续滚动的内容区域</div>
+        </div>
+
+        <p class="helper">先拖动框选；开始后手动向下滚动，点击任一结果按钮即可结束并执行</p>
+
+        <section class="control-panel" id="controlPanel" aria-live="polite">
+          <div class="panel-main">
+            <div class="panel-eyebrow"><span class="live-dot"></span><span id="eyebrow">准备长截屏</span></div>
+            <div class="panel-title" id="panelTitle">先框选滚动内容区域</div>
+            <div class="panel-subtitle" id="panelSubtitle">按住并拖动鼠标，松开后锁定本次长截屏范围</div>
+          </div>
+          <div class="panel-actions">
+            <button type="button" class="action primary start" id="startButton" disabled>开始长截屏</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="pin-workspace is-selecting" id="pinWorkspace" data-page-pane="pin" aria-label="挂在页面上的截图">
+        <div class="pin-stage" id="pinStage">
+          <div class="pin-source" id="pinSource" aria-label="用于选择截图区域的页面">
+            <img id="pinSourceImage" src="scroll-capture-reference.png" alt="用于演示悬挂截图的虚构示例页面" />
+            <div class="pin-source-chrome" aria-hidden="true">移动时选中窗口；单击截取窗口，拖动截取区域</div>
+          </div>
+          <div class="pin-selection" id="pinSelection" aria-hidden="true">
+            <span class="corner tl"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="corner-contrast" d="M4 22V10A6 6 0 0 1 10 4H22"/><path class="corner-primary" d="M4 22V10A6 6 0 0 1 10 4H22"/></svg></span>
+            <span class="corner tr"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="corner-contrast" d="M4 22V10A6 6 0 0 1 10 4H22"/><path class="corner-primary" d="M4 22V10A6 6 0 0 1 10 4H22"/></svg></span>
+            <span class="corner bl"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="corner-contrast" d="M4 22V10A6 6 0 0 1 10 4H22"/><path class="corner-primary" d="M4 22V10A6 6 0 0 1 10 4H22"/></svg></span>
+            <span class="corner br"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="corner-contrast" d="M4 22V10A6 6 0 0 1 10 4H22"/><path class="corner-primary" d="M4 22V10A6 6 0 0 1 10 4H22"/></svg></span>
+          </div>
+          <canvas class="quick-markup-canvas" id="quickMarkupCanvas" tabindex="0" aria-label="截图快速标注画布。选择和移动工具默认选中；尚无标注时，可从选区内部拖动整体范围，边缘和四角可调整大小。" hidden></canvas>
+          <textarea class="quick-markup-text" id="quickMarkupText" aria-label="输入标注文字，按 Command 加 Enter 完成，Escape 取消" placeholder="输入文字" hidden></textarea>
+          <div class="post-capture-chooser has-scroll-capture area-result-chooser" id="postCaptureChooser" role="toolbar" aria-label="选择这次截图的下一步" hidden>
+            <button type="button" class="post-capture-action is-cancel" data-post-capture-action="close" aria-label="关闭这次截图，不复制">
+              <svg viewBox="0 0 18 18" aria-hidden="true">
+                <path d="M5 5l8 8M13 5l-8 8"></path>
+              </svg>
+            </button>
+            <button type="button" class="post-capture-action" data-quick-tool="select" aria-label="选择和移动 (V)；默认可拖动截图范围" aria-pressed="true"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="m4 2 10 8-5 .7L7 15 4 2Z"/></svg></button>
+            <span class="quick-markup-divider" aria-hidden="true"></span>
+            <button type="button" class="post-capture-action" data-quick-tool="rectangle" aria-label="矩形 (R)；选择后开始绘制" aria-pressed="false"><svg viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="4" width="12" height="10" rx="1"/></svg></button>
+            <button type="button" class="post-capture-action" data-quick-tool="ellipse" aria-label="椭圆 (E)" aria-pressed="false"><svg viewBox="0 0 18 18" aria-hidden="true"><ellipse cx="9" cy="9" rx="6" ry="5"/></svg></button>
+            <button type="button" class="post-capture-action" data-quick-tool="arrow" aria-label="箭头 (A)" aria-pressed="false"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="m3 15 12-12M7 3h8v8"/></svg></button>
+            <button type="button" class="post-capture-action" data-quick-tool="pencil" aria-label="画笔 (P)" aria-pressed="false"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="m3 15 1-4L12 3l3 3-8 8-4 1ZM10 5l3 3"/></svg></button>
+            <button type="button" class="post-capture-action" data-quick-tool="text" aria-label="文字 (T)" aria-pressed="false"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M4 5V3h10v2M9 3v12M6 15h6"/></svg></button>
+            <button type="button" class="post-capture-action" data-quick-tool="pixelate" aria-label="马赛克 (X)" aria-pressed="false"><svg viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="3" width="12" height="12" rx="1"/><path d="M7 3v12M11 3v12M3 7h12M3 11h12"/></svg></button>
+            <input class="quick-markup-color" id="quickMarkupColor" type="color" value="#ff3b30" aria-label="标注颜色" title="标注颜色" />
+            <select class="quick-markup-width" id="quickMarkupWidth" aria-label="标注线宽"><option value="2">2 pt</option><option value="4" selected>4 pt</option><option value="8">8 pt</option></select>
+            <span class="quick-markup-divider" aria-hidden="true"></span>
+            <button type="button" class="post-capture-action" id="quickMarkupUndo" aria-label="撤销标注 (Command Z)" disabled><svg viewBox="0 0 18 18" aria-hidden="true"><path d="m7 4-4 4 4 4M3 8h8a4 4 0 0 1 0 8"/></svg></button>
+            <button type="button" class="post-capture-action" id="quickMarkupRedo" aria-label="重做标注 (Command Shift Z)" disabled><svg viewBox="0 0 18 18" aria-hidden="true"><path d="m11 4 4 4-4 4M15 8H7a4 4 0 0 0 0 8"/></svg></button>
+            <div class="quick-markup-results">
+            <span class="quick-markup-divider" aria-hidden="true"></span>
+            <button type="button" class="post-capture-action" data-post-capture-action="scroll" aria-label="长截屏">
+              <svg viewBox="0 0 18 18" aria-hidden="true">
+                <path d="M4.5 2.5h9A1.5 1.5 0 0 1 15 4v8.5M4.5 2.5A1.5 1.5 0 0 0 3 4v2h3V4a1.5 1.5 0 0 0-1.5-1.5ZM6 6v8a1.5 1.5 0 0 0 3 0v-1.5h7V14a1.5 1.5 0 0 1-1.5 1.5h-7"></path>
+                <path d="M8.5 6h4M8.5 8.5H11"></path>
+              </svg>
+            </button>
+            <button type="button" class="post-capture-action" data-post-capture-action="edit" aria-label="编辑这次截图">
+              <img src="post-capture-icons/edit.png" alt="" />
+            </button>
+            <button type="button" class="post-capture-action" data-post-capture-action="ocr" aria-label="识别这次截图中的文字">
+              <svg viewBox="0 0 18 18" aria-hidden="true">
+                <path d="M3 6V3h3M12 3h3v3M15 12v3h-3M6 15H3v-3"></path>
+                <path d="M6 7h6M9 7v5"></path>
+              </svg>
+            </button>
+            <button type="button" class="post-capture-action" data-post-capture-action="pin" aria-label="悬浮这次截图">
+              <img src="post-capture-icons/pin.png" alt="" />
+            </button>
+            <button type="button" class="post-capture-action" data-post-capture-action="save" aria-label="下载这次截图 (Command S)">
+              <svg viewBox="0 0 18 18" aria-hidden="true">
+                <path d="M9 3v8M6 8l3 3 3-3M4 14h10"></path>
+              </svg>
+            </button>
+            <button type="button" class="post-capture-action" data-post-capture-action="copy" aria-label="复制这次截图">
+              <img src="post-capture-icons/copy.png" alt="" />
+            </button>
+            </div>
+            <span class="quick-markup-message" id="quickMarkupMessage" role="status" aria-live="polite" hidden></span>
+          </div>
+          <div class="pin-dock" aria-live="polite">
+            <span id="pinStatus">拖动框选要挂在页面上的截图</span>
+            <button type="button" id="pinNewCapture">框选截图</button>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const root = document.getElementById('prototype');
+      const host = document.getElementById('editorHost');
+      const toast = document.getElementById('editorToast');
+      const loading = document.getElementById('editorLoading');
+      const editorActionTemplate = document.getElementById('editorActionTemplate');
+      const editorCommandSlot = document.getElementById('editorCommandSlot');
+      const pageButtons = [...document.querySelectorAll('[data-page-nav]')];
+      const bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.captures;
+      let editor = null;
+      let nativeSource = false;
+      let scriptPromise = null;
+      let toastTimer = null;
+      let toolStripObserver = null;
+      let toolStripFrame = null;
+
+      const send = (payload) => bridge && bridge.postMessage(payload);
+
+      const showToast = (message) => {
+        if (!toast) return;
+        toast.textContent = message;
+        toast.classList.add('is-visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2200);
+      };
+
+      const setLoadingMessage = (message) => {
+        if (loading) loading.textContent = message;
+      };
+
+      const isStandaloneDesign = /[\\/]design[\\/]/.test(window.location.pathname);
+      const standaloneFallbackSource = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Yq0UAAAAASUVORK5CYII=';
+
+      const loadStandaloneSource = () => {
+        const image = document.getElementById('sourceImage');
+        if (!image) return Promise.resolve(standaloneFallbackSource);
+        if (image.complete) return Promise.resolve(image.naturalWidth ? image : standaloneFallbackSource);
+        return new Promise((resolve) => {
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeout);
+            resolve(image.naturalWidth ? image : standaloneFallbackSource);
+          };
+          const timeout = setTimeout(finish, 2500);
+          image.addEventListener('load', finish, { once: true });
+          image.addEventListener('error', finish, { once: true });
+        });
+      };
+
+      const loadEditorBundle = () => {
+        if (window.FilerobotImageEditor) return Promise.resolve();
+        if (scriptPromise) return scriptPromise;
+        scriptPromise = new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = isStandaloneDesign
+            ? '../Captures/Resources/ImageEditor/FilerobotImageEditor.min.js'
+            : 'FilerobotImageEditor.min.js';
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('FilerobotImageEditor bundle failed to load'));
+          document.head.appendChild(script);
+        });
+        return scriptPromise;
+      };
+
+      const appleSkin = document.createElement('style');
+      appleSkin.id = 'captures-apple-image-editor-skin';
+      appleSkin.textContent = `
+        #editorHost .FIE_root {
+          --captures-blue: #0a84ff;
+          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif !important;
+          color: #1d1d1f !important;
+          background: #f5f5f7 !important;
+          position: relative !important;
+          border: 0 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          overflow: hidden !important;
+        }
+        #editorHost .FIE_topbar { display: none !important; }
+        #editorHost .FIE_main-container {
+          width: 100% !important;
+          height: 100% !important;
+          background: #f2f2f7 !important;
+        }
+        #editorHost .FIE_tabs {
+          display: none !important;
+        }
+        #editorHost .FIE_tabs-drawer,
+        #editorHost .FIE_tabs_toggle_btn { display: none !important; }
+        #editorHost .FIE_editor-content {
+          background: #f5f5f7 !important;
+          min-width: 0 !important;
+          display: flex !important;
+          flex-direction: column !important;
+          height: 100% !important;
+        }
+        #editorHost .FIE_canvas-container {
+          order: 1 !important;
+          flex: 1 1 auto !important;
+          min-height: 0 !important;
+          padding: 8px !important;
+        }
+        #editorHost .FIE_canvas-node { background: #fff !important; box-shadow: none !important; }
+        #editorHost .FIE_tools-bar-wrapper {
+          order: 0 !important;
+          align-self: stretch !important;
+          width: 100% !important;
+          flex: 0 0 auto !important;
+          margin: 0 !important;
+          min-height: 32px !important;
+          max-height: 76px !important;
+          max-width: none !important;
+          border: 0 !important;
+          border-bottom: 1px solid rgba(29,29,31,.10) !important;
+          border-radius: 0 !important;
+          background: #fff !important;
+          box-shadow: none !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          text-align: center !important;
+        }
+        #editorHost .FIE_tools-bar {
+          display: inline-flex !important;
+          width: max-content !important;
+          min-width: max-content !important;
+          min-height: 32px !important;
+          height: 32px !important;
+          margin: 0 auto !important;
+          padding: 1px 7px !important;
+          gap: 2px !important;
+        }
+        #editorHost .FIE_tools-bar,
+        #editorHost .FIE_tools-bar * {
+          font-size: 9px !important;
+          line-height: 11px !important;
+        }
+        #editorHost .FIE_tool-options-wrapper {
+          box-sizing: border-box !important;
+          width: 100% !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 5px !important;
+          padding: 2px 12px 3px !important;
+          min-height: 32px !important;
+          max-height: 44px !important;
+          border-bottom: 1px solid rgba(29,29,31,.08) !important;
+          border-top: 0 !important;
+          background: #fff !important;
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          text-align: center !important;
+        }
+        #editorHost .FIE_tool-options-wrapper:empty { display: none !important; }
+        #editorHost .FIE_tool-options-wrapper > * { flex: 0 0 auto !important; margin: 0 !important; }
+        #editorHost .FIE_tool-options-wrapper,
+        #editorHost .FIE_tool-options-wrapper * {
+          font-size: 9px !important;
+          line-height: 13px !important;
+        }
+        #editorHost .FIE_tool-options-wrapper label,
+        #editorHost .FIE_tool-options-wrapper [class*="label" i] {
+          color: #6e6e73 !important;
+          font-size: 9px !important;
+          line-height: 13px !important;
+          white-space: nowrap !important;
+        }
+        #editorHost .FIE_tool-options-wrapper svg { width: 16px !important; height: 16px !important; }
+        #editorHost .FIE_tool-options-wrapper input[type="range"] {
+          width: 92px !important;
+          accent-color: #0a84ff !important;
+        }
+        #editorHost .FIE_tool-options-wrapper input[type="color"] {
+          width: 22px !important;
+          height: 22px !important;
+          padding: 1px !important;
+          border: 1px solid rgba(29,29,31,.16) !important;
+          border-radius: 6px !important;
+          background: #fff !important;
+        }
+        #editorHost .FIE_tool-options-wrapper input,
+        #editorHost .FIE_tool-options-wrapper select,
+        #editorHost .FIE_tool-options-wrapper button {
+          min-height: 24px !important;
+          color: #1d1d1f !important;
+          font-size: 9px !important;
+        }
+        #editorHost .FIE_tool-options-wrapper > [class*="-option-wrapper"] {
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 6px !important;
+          min-height: 28px !important;
+          max-height: 28px !important;
+        }
+        #editorHost .FIE_tool-options-wrapper > [class*="-option-wrapper"] > label {
+          font-size: 8px !important;
+          line-height: 11px !important;
+        }
+        #editorHost .FIE_tool-options-wrapper [class*="SfxSlider-root"] { width: 96px !important; }
+        #editorHost .FIE_tool-options-wrapper input:not([type="range"]):not([type="color"]),
+        #editorHost .FIE_tool-options-wrapper select {
+          max-width: 124px !important;
+          padding: 2px 6px !important;
+          border: 1px solid rgba(29,29,31,.14) !important;
+          background: #fff !important;
+        }
+        #editorHost .FIE_tools { gap: 2px !important; }
+        #editorHost .FIE_tools-wrapper,
+        #editorHost .FIE_tools-items,
+        #editorHost .FIE_tools-item-wrapper,
+        #editorHost .FIE_filters-wrapper,
+        #editorHost .FIE_filters-items,
+        #editorHost .FIE_filters-item-wrapper {
+          min-height: 0 !important;
+          height: 32px !important;
+        }
+        #editorHost .FIE_tools-items > li > *,
+        #editorHost .FIE_filters-item {
+          min-height: 0 !important;
+          height: 26px !important;
+          padding: 3px 6px !important;
+          gap: 3px !important;
+          font-size: 9px !important;
+          line-height: 11px !important;
+        }
+        #editorHost .FIE_tools-items > li,
+        #editorHost .FIE_filters-items > li { padding: 2px !important; }
+        #editorHost .FIE_tools-items > li > * svg,
+        #editorHost .FIE_filters-item svg { width: 14px !important; height: 14px !important; }
+        #editorHost .FIE_filters-item-label,
+        #editorHost .FIE_filters-item-label span { font-size: 8px !important; line-height: 9px !important; }
+        #editorHost .FIE_tools-bar [aria-selected="true"],
+        #editorHost .FIE_tools-bar [class*="selected" i],
+        #editorHost .FIE_tools-bar [class*="active" i] {
+          border-radius: 6px !important;
+          background: #0a84ff !important;
+          color: #fff !important;
+        }
+        #editorHost .FIE_tools-bar [aria-selected="true"] *,
+        #editorHost .FIE_tools-bar [class*="selected" i] *,
+        #editorHost .FIE_tools-bar [class*="active" i] * { color: #fff !important; fill: currentColor !important; }
+        #editorHost .FIE_tools-bar-wrapper:has(.FIE_filters-items) {
+          min-height: 60px !important;
+          max-height: 60px !important;
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          scrollbar-width: thin;
+        }
+        #editorHost .FIE_tools-bar:has(.FIE_filters-items) {
+          min-height: 60px !important;
+          height: 60px !important;
+          margin: 0 !important;
+          padding: 3px 10px !important;
+        }
+        #editorHost .FIE_tools-wrapper:has(.FIE_filters-items),
+        #editorHost .FIE_tools-items:has(.FIE_filters-items),
+        #editorHost .FIE_tools-item-wrapper:has(.FIE_filters-items),
+        #editorHost .FIE_filters-wrapper,
+        #editorHost .FIE_filters-items,
+        #editorHost .FIE_filters-item-wrapper {
+          height: 54px !important;
+        }
+        #editorHost .FIE_tools-item-wrapper:has(.FIE_filters-items),
+        #editorHost .FIE_filters-wrapper {
+          padding: 0 !important;
+        }
+        #editorHost .FIE_filters-items > li {
+          box-sizing: border-box !important;
+          width: 112px !important;
+          min-width: 112px !important;
+          height: 54px !important;
+          padding: 2px !important;
+        }
+        #editorHost .FIE_filters-item {
+          box-sizing: border-box !important;
+          width: 108px !important;
+          min-width: 108px !important;
+          height: 50px !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
+          gap: 2px !important;
+          padding: 2px 4px !important;
+          border-radius: 6px !important;
+          background: transparent !important;
+        }
+        #editorHost .FIE_filters-item-preview {
+          box-sizing: border-box !important;
+          width: 100px !important;
+          min-width: 100px !important;
+          height: 36px !important;
+          min-height: 36px !important;
+          overflow: hidden !important;
+          border: 1px solid rgba(29,29,31,.10) !important;
+          border-radius: 4px !important;
+          background: #f2f2f7 !important;
+        }
+        #editorHost .FIE_filters-item-preview .konvajs-content {
+          position: relative !important;
+          top: -18px !important;
+          transform: scale(1.67) !important;
+          transform-origin: top left !important;
+        }
+        #editorHost .FIE_filters-item[aria-selected="true"],
+        #editorHost .FIE_filters-item[class*="selected" i],
+        #editorHost .FIE_filters-item[class*="active" i] {
+          background: rgba(10,132,255,.08) !important;
+          color: #007aff !important;
+          box-shadow: inset 0 0 0 1px rgba(10,132,255,.34) !important;
+        }
+        #editorHost .FIE_filters-item[aria-selected="true"] *,
+        #editorHost .FIE_filters-item[class*="selected" i] *,
+        #editorHost .FIE_filters-item[class*="active" i] * {
+          color: #007aff !important;
+        }
+        #editorHost .FIE_save-modal, #editorHost .SfxModal-Wrapper { border-radius: 16px !important; }
+        #editorHost input, #editorHost select { border-radius: 9px !important; }
+      `;
+      document.head.appendChild(appleSkin);
+
+      const zh = {
+        save: '保存', saveAs: '另存为', cancel: '取消', apply: '应用', close: '关闭',
+        undoTitle: '撤销', redoTitle: '重做', reset: '重置', name: '文件名', quality: '质量', format: '格式', saving: '正在导出…',
+        adjustTab: '调整', finetuneTab: '精修', filtersTab: '滤镜', annotateTabLabel: '标注', watermarkTab: '水印', resizeTab: '缩放',
+        cropTool: '裁剪', rotateTool: '旋转', flipX: '水平翻转', flipY: '垂直翻转', brightnessTool: '亮度', contrastTool: '对比度', blurTool: '模糊',
+        pixelateTool: '马赛克', hueSaturationValueTool: '色相和饱和度', warmthTool: '色温', thresholdTool: '阈值', posterizeTool: '色调分离', noiseTool: '噪点', filtersTool: '滤镜',
+        rectangleTool: '矩形', ellipseTool: '椭圆', polygonTool: '多边形', textTool: '文字', lineTool: '直线', arrowTool: '箭头', penTool: '画笔', imageTool: '图片',
+        watermarkTool: '水印', resizeTool: '缩放', width: '宽度', height: '高度', lockAspectRatio: '锁定比例', crop: '裁剪', rotate: '旋转',
+        zoomIn: '放大', zoomOut: '缩小', fitToScreen: '适合窗口', original: '原始比例', custom: '自定义', backgroundColor: '背景颜色', opacity: '不透明度', color: '颜色', stroke: '描边', fill: '填充'
+      };
+
+      const configuration = (source) => {
+        const ImageEditor = window.FilerobotImageEditor;
+        const TABS = ImageEditor.TABS;
+        const TOOLS = ImageEditor.TOOLS;
+        return {
+          source,
+          theme: {
+            palette: {
+              'bg-secondary': '#f5f5f7', 'bg-stateless': 'rgba(255, 255, 255, .82)', 'bg-primary-active': 'rgba(10, 132, 255, .11)',
+              'bg-hover': 'rgba(29, 29, 31, .05)', 'txt-primary': '#1d1d1f', 'txt-secondary': '#6e6e73', 'txt-placeholder': '#86868b',
+              'icon-primary': '#1d1d1f', 'icon-secondary': '#6e6e73', 'accent-primary': '#0a84ff', 'accent-primary-hover': '#168cff',
+              'accent-primary-active': '#0a84ff', 'accent-stateless': '#0a84ff', 'borders-secondary': 'rgba(29, 29, 31, .09)',
+              'borders-primary': 'rgba(29, 29, 31, .12)', 'border-primary-stateless': 'rgba(29, 29, 31, .12)'
+            },
+            typography: { fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif' }
+          },
+          tabsIds: [TABS.ADJUST, TABS.FINETUNE, TABS.FILTERS, TABS.ANNOTATE, TABS.WATERMARK, TABS.RESIZE],
+          defaultTabId: TABS.ANNOTATE,
+          defaultToolId: TOOLS.ARROW,
+          defaultSavedImageName: '截图',
+          defaultSavedImageType: 'png',
+          defaultSavedImageQuality: 0.95,
+          savingPixelRatio: 1,
+          previewPixelRatio: 1,
+          observePluginContainerSize: true,
+          useBackendTranslations: false,
+          translations: zh,
+          language: 'zh',
+          disableSaveIfNoChanges: false,
+          onSave: (imageData) => {
+            send({ action: 'save', dataURL: imageData.imageBase64, name: imageData.name || '截图', extension: imageData.extension || 'png' });
+            if (!bridge) showToast('原型预览：已准备保存图片');
+          }
+        };
+      };
+
+      const mountEditorActions = () => {
+        if (!host || !editorActionTemplate || !editorCommandSlot) return;
+        if (!editorCommandSlot.firstElementChild) {
+          editorCommandSlot.appendChild(editorActionTemplate.firstElementChild.cloneNode(true));
+        }
+
+        const commandBar = editorCommandSlot.firstElementChild;
+        if (!commandBar || commandBar.dataset.bound === 'true') return;
+        commandBar.dataset.bound = 'true';
+
+        const clickFilerobotButton = (names, selector) => {
+          const candidates = selector
+            ? [...host.querySelectorAll(selector)]
+            : [...host.querySelectorAll('.FIE_topbar button, .FIE_topbar [role="button"]')];
+          const target = candidates.find((button) => {
+            const value = [button.textContent, button.title, button.getAttribute('aria-label'), button.dataset.tooltip]
+              .filter(Boolean).join(' ').toLowerCase();
+            return names.some((name) => value.includes(name));
+          });
+          if (!target) { showToast('该编辑器命令暂不可用'); return; }
+          target.click();
+        };
+
+        commandBar.querySelectorAll('[data-editor-tab]').forEach((button) => {
+          button.addEventListener('pointerdown', () => { button.dataset.pointerActivation = 'true'; }, { passive: true });
+          button.addEventListener('click', () => {
+            const label = button.dataset.editorTab;
+            const target = [...host.querySelectorAll('.FIE_tab')]
+              .find((tab) => tab.textContent.replace(/\s+/g, '').includes(label));
+            if (!target) {
+              showToast('该编辑功能暂不可用');
+              if (button.dataset.pointerActivation === 'true') button.blur();
+              delete button.dataset.pointerActivation;
+              return;
+            }
+            target.click();
+            commandBar.querySelectorAll('[data-editor-tab]').forEach((tab) => {
+              tab.setAttribute('aria-selected', String(tab === button));
+            });
+            if (button.dataset.pointerActivation === 'true') button.blur();
+            delete button.dataset.pointerActivation;
+            requestAnimationFrame(() => {
+              localizeToolOptionTitles();
+              compactToolStrip();
+            });
+          });
+        });
+
+        commandBar.querySelectorAll('[data-editor-action]').forEach((button) => {
+          button.addEventListener('click', () => exportCurrent(button.dataset.editorAction));
+        });
+
+        commandBar.querySelectorAll('[data-editor-control]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const control = button.dataset.editorControl;
+            if (control === 'save') {
+              clickFilerobotButton(['保存', 'save'], '.FIE_topbar-save');
+              return;
+            }
+            if (control === 'fit') {
+              // Filerobot recalculates its canvas against the live host size.
+              // Keeping this as a real layout recalculation avoids a second,
+              // fake zoom model in the surrounding prototype chrome.
+              window.dispatchEvent(new Event('resize'));
+              showToast('画布已适应窗口');
+              return;
+            }
+            const labels = {
+              'zoom-out': ['缩小', 'zoomout', 'zoom out'],
+              fit: ['适合窗口', '适应', 'fit to screen', 'fit'],
+              'zoom-in': ['放大', 'zoomin', 'zoom in'],
+              reset: ['刷新', '重置', 'reset'],
+              undo: ['撤销', 'undo'],
+              redo: ['重做', 'redo']
+            };
+            clickFilerobotButton(labels[control] || []);
+          });
+        });
+      };
+
+      const localizeToolOptionTitles = () => {
+        const titles = {
+          'Text alignment': '文字对齐',
+          'Text spacings': '文字间距',
+          Shadow: '阴影',
+          Position: '位置',
+          'Show original image': '查看原图',
+          'Zoom out': '缩小',
+          'Zoom in': '放大',
+          'Reset/delete all operations': '刷新'
+        };
+        host?.querySelectorAll('[title]').forEach((element) => {
+          if (titles[element.title]) element.title = titles[element.title];
+        });
+      };
+
+      const compactToolStrip = () => {
+        if (!host) return;
+        host.querySelectorAll('.FIE_tools-items > li, .FIE_filters-items > li').forEach((item) => {
+          const isFilter = item.matches('.FIE_filters-items > li');
+          const isFilterContainer = !isFilter && Boolean(item.querySelector('.FIE_filters-items'));
+          if (isFilterContainer) {
+            item.style.setProperty('height', '54px', 'important');
+            item.style.setProperty('padding', '0', 'important');
+            const filterWrapper = item.firstElementChild;
+            if (filterWrapper) {
+              filterWrapper.style.setProperty('height', '54px', 'important');
+              filterWrapper.style.setProperty('min-height', '54px', 'important');
+              filterWrapper.style.setProperty('padding', '0', 'important');
+              filterWrapper.style.setProperty('gap', '0', 'important');
+              filterWrapper.style.setProperty('font-size', '8px', 'important');
+              filterWrapper.style.setProperty('line-height', '9px', 'important');
+            }
+            return;
+          }
+          item.style.setProperty('padding', '2px', 'important');
+          if (isFilter) {
+            item.style.setProperty('width', '112px', 'important');
+            item.style.setProperty('min-width', '112px', 'important');
+            item.style.setProperty('height', '54px', 'important');
+          }
+          const control = item.firstElementChild;
+          if (!control) return;
+          control.style.setProperty('height', isFilter ? '50px' : '24px', 'important');
+          control.style.setProperty('min-height', '0', 'important');
+          control.style.setProperty('padding', isFilter ? '2px 4px' : '2px 5px', 'important');
+          control.style.setProperty('gap', isFilter ? '2px' : '3px', 'important');
+          control.style.setProperty('font-size', isFilter ? '8px' : '9px', 'important');
+          control.style.setProperty('line-height', isFilter ? '9px' : '11px', 'important');
+        });
+        host.querySelectorAll('.FIE_tools-items svg, .FIE_filters-item svg').forEach((icon) => {
+          icon.style.setProperty('width', '14px', 'important');
+          icon.style.setProperty('height', '14px', 'important');
+        });
+      };
+
+      const observeToolStrip = () => {
+        if (!host || toolStripObserver) return;
+        toolStripObserver = new MutationObserver(() => {
+          cancelAnimationFrame(toolStripFrame);
+          toolStripFrame = requestAnimationFrame(compactToolStrip);
+        });
+        toolStripObserver.observe(host, { childList: true, subtree: true });
+      };
+
+      const renderEditor = (source) => {
+        if (!window.FilerobotImageEditor || !host) return;
+        if (editor) editor.terminate();
+        editor = new window.FilerobotImageEditor(host, configuration(source));
+        editor.render();
+        // Filerobot injects its own styled-component rules during render. Put
+        // the compact native skin back at the end so its deliberate spacing
+        // and selected-state rules win over those defaults.
+        document.head.appendChild(appleSkin);
+        setTimeout(() => {
+          mountEditorActions();
+          localizeToolOptionTitles();
+          compactToolStrip();
+          observeToolStrip();
+        }, 80);
+      };
+
+      const ensureEditor = () => {
+        if (editor || nativeSource) return;
+        loadEditorBundle()
+          .then(() => loadStandaloneSource())
+          .then((source) => renderEditor(source))
+          .catch(() => {
+            setLoadingMessage('编辑器组件未加载，请检查本地资源');
+            showToast('无法加载图片编辑器组件');
+          });
+      };
+
+      const exportCurrent = (action) => {
+        if (!editor) { showToast('图片编辑器还在加载'); return; }
+        const result = editor.getCurrentImgData({ name: '截图', extension: 'png', quality: 0.95 }, 1);
+        const imageData = result && result.imageData;
+        if (!imageData || !imageData.imageBase64) { showToast('暂时无法导出当前图片'); return; }
+        send({ action, dataURL: imageData.imageBase64 });
+        if (!bridge) showToast(action === 'ocr' ? '原型预览：已准备 OCR' : '原型预览：已准备复制');
+      };
+
+      window.CapturesImageEditor = {
+        open(source) {
+          nativeSource = true;
+          loadEditorBundle().then(() => renderEditor(source)).catch(() => {
+            setLoadingMessage('编辑器组件未加载，请检查本地资源');
+            showToast('无法加载图片编辑器组件');
+          });
+        },
+        exportCurrent
+      };
+
+      window.CapturesPrototype = {
+        openEditor(source) {
+          setPage('editor');
+          window.CapturesImageEditor.open(source);
+        },
+        openScroll(selection) {
+          setPage('scroll');
+          window.dispatchEvent(new CustomEvent('captures-start-scroll-from-area', {
+            detail: { selection }
+          }));
+        },
+        announce: showToast
+      };
+
+      const setPage = (page) => {
+        if (!pageButtons.some((button) => button.dataset.pageNav === page)) return;
+        const previousPage = root.dataset.page;
+        root.dataset.page = page;
+        pageButtons.forEach((button) => {
+          const selected = button.dataset.pageNav === page;
+          button.setAttribute('aria-selected', String(selected));
+          button.tabIndex = selected ? 0 : -1;
+        });
+        document.querySelectorAll('[data-page-pane]').forEach((pane) => {
+          pane.setAttribute('aria-hidden', String(pane.dataset.pagePane !== page));
+        });
+        const pageLabels = { editor: '图片编辑', scroll: '滚动捕获', pin: '挂在页面上' };
+        document.title = `Captures · ${pageLabels[page] || pageLabels.editor}`;
+        if (page === 'editor') ensureEditor();
+        requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+        if (previousPage !== page) {
+          window.dispatchEvent(new CustomEvent('captures-page-change', { detail: { page } }));
+        }
+      };
+
+      pageButtons.forEach((button) => {
+        button.addEventListener('pointerdown', () => { button.dataset.pointerActivation = 'true'; }, { passive: true });
+        button.addEventListener('click', () => {
+          setPage(button.dataset.pageNav);
+          if (button.dataset.pointerActivation === 'true') button.blur();
+          delete button.dataset.pointerActivation;
+        });
+      });
+      pageButtons.forEach((button, index) => button.addEventListener('keydown', (event) => {
+        let nextIndex = null;
+        if (event.key === 'ArrowLeft') nextIndex = (index - 1 + pageButtons.length) % pageButtons.length;
+        if (event.key === 'ArrowRight') nextIndex = (index + 1) % pageButtons.length;
+        if (event.key === 'Home') nextIndex = 0;
+        if (event.key === 'End') nextIndex = pageButtons.length - 1;
+        if (nextIndex === null) return;
+        event.preventDefault();
+        const nextButton = pageButtons[nextIndex];
+        setPage(nextButton.dataset.pageNav);
+        nextButton.focus();
+      }));
+      setPage(root.dataset.page || 'editor');
+      requestAnimationFrame(() => { root.dataset.ready = 'true'; });
+    })();
+
+  </script>
+  <script>
+    (() => {
+      const root = document.getElementById('prototype');
+      const sourceWindow = document.getElementById('sourceWindow');
+      const sourcePage = document.getElementById('sourcePage');
+      const sourceImage = document.getElementById('sourceImage');
+      const selectionWindow = document.getElementById('selectionWindow');
+      const frameCaption = document.getElementById('frameCaption');
+      const eyebrow = document.getElementById('eyebrow');
+      const panelTitle = document.getElementById('panelTitle');
+      const panelSubtitle = document.getElementById('panelSubtitle');
+      const startButton = document.getElementById('startButton');
+      const scrollCaptureChooser = document.getElementById('scrollCaptureChooser');
+      const scrollCapturePreview = document.getElementById('scrollCapturePreview');
+      const scrollCapturePreviewImage = document.getElementById('scrollCapturePreviewImage');
+      const scrollResultStatus = document.getElementById('scrollResultStatus');
+      const scrollInputShields = Object.fromEntries(
+        [...document.querySelectorAll('[data-scroll-input-shield]')].map((shield) => [
+          shield.dataset.scrollInputShield,
+          shield,
+        ])
+      );
+      const stateButtons = [...document.querySelectorAll('[data-state-button]')];
+
+      let state = 'select';
+      let offset = 0;
+      let maxCapturedOffset = 0;
+      let maxOffset = 1;
+      let selection = null;
+      let dragOrigin = null;
+      let isDragging = false;
+      let isCompleting = false;
+      let scrollStatusTimer = null;
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
+
+      const announceScrollResult = (message) => {
+        scrollResultStatus.textContent = message;
+        scrollResultStatus.classList.add('is-visible');
+        clearTimeout(scrollStatusTimer);
+        scrollStatusTimer = setTimeout(() => scrollResultStatus.classList.remove('is-visible'), 2400);
+      };
+
+      const pointInSourceWindow = (event) => {
+        const bounds = sourceWindow.getBoundingClientRect();
+        return {
+          x: clamp(event.clientX - bounds.left, 0, bounds.width),
+          y: clamp(event.clientY - bounds.top, 0, bounds.height),
+        };
+      };
+
+      const pointIsInsideSelection = (point) => selection
+        && point.x >= selection.x
+        && point.x <= selection.x + selection.width
+        && point.y >= selection.y
+        && point.y <= selection.y + selection.height;
+
+      const rectFromPoints = (start, end) => ({
+        x: Math.min(start.x, end.x),
+        y: Math.min(start.y, end.y),
+        width: Math.abs(end.x - start.x),
+        height: Math.abs(end.y - start.y),
+      });
+
+      const setShieldFrame = (shield, rect) => {
+        const isVisible = state === 'capturing' && rect.width > 0 && rect.height > 0;
+        shield.style.display = isVisible ? 'block' : 'none';
+        if (!isVisible) return;
+        shield.style.left = `${rect.x}px`;
+        shield.style.top = `${rect.y}px`;
+        shield.style.width = `${rect.width}px`;
+        shield.style.height = `${rect.height}px`;
+      };
+
+      const updateScrollInputShields = () => {
+        const width = sourceWindow.clientWidth;
+        const height = sourceWindow.clientHeight;
+        if (!selection || state !== 'capturing') {
+          Object.values(scrollInputShields).forEach((shield) => {
+            shield.style.display = 'none';
+          });
+          return;
+        }
+
+        setShieldFrame(scrollInputShields.top, {
+          x: 0, y: 0, width, height: selection.y,
+        });
+        setShieldFrame(scrollInputShields.bottom, {
+          x: 0,
+          y: selection.y + selection.height,
+          width,
+          height: height - selection.y - selection.height,
+        });
+        setShieldFrame(scrollInputShields.left, {
+          x: 0, y: selection.y, width: selection.x, height: selection.height,
+        });
+        setShieldFrame(scrollInputShields.right, {
+          x: selection.x + selection.width,
+          y: selection.y,
+          width: width - selection.x - selection.width,
+          height: selection.height,
+        });
+      };
+
+      const clearSelection = () => {
+        selection = null;
+        selectionWindow.style.left = '';
+        selectionWindow.style.top = '';
+        selectionWindow.style.width = '';
+        selectionWindow.style.height = '';
+        sourceWindow.classList.remove('has-selection');
+        startButton.disabled = true;
+        frameCaption.textContent = '未选择区域';
+      };
+
+      const applySelection = (rect) => {
+        selection = rect;
+        selectionWindow.style.left = `${rect.x}px`;
+        selectionWindow.style.top = `${rect.y}px`;
+        selectionWindow.style.width = `${rect.width}px`;
+        selectionWindow.style.height = `${rect.height}px`;
+        sourceWindow.classList.add('has-selection');
+        startButton.disabled = false;
+        updateScrollInputShields();
+        frameCaption.textContent = '已选区域';
+        panelTitle.textContent = '区域已框选';
+        panelSubtitle.textContent = '松开鼠标后选区会固定；确认范围后开始长截屏';
+      };
+
+      const positionScrollCaptureChooser = () => {
+        if (!selection) return;
+        const chooserWidth = 168;
+        const chooserHeight = 34;
+        const previewWidth = 60;
+        const gap = 8;
+        const insideInset = 8;
+        const outsideAbove = selection.y - chooserHeight - gap;
+        const isInside = outsideAbove < 8;
+        const preferredX = selection.x + (isInside ? insideInset : 0);
+        const capturedHeight = selection.height + Math.max(0, maxCapturedOffset);
+        const previewHeight = clamp((capturedHeight / selection.width) * 52 + 8, 46, 260);
+        const desiredTop = isInside ? selection.y + insideInset : outsideAbove;
+        // The action capsule sits above the selected content. The live preview
+        // belongs to the frame below it, so its top edge follows the selected
+        // rectangle instead of the action capsule.
+        const y = clamp(desiredTop, 8, sourceWindow.clientHeight - chooserHeight - 8);
+        const previewY = clamp(
+          selection.y,
+          8,
+          sourceWindow.clientHeight - previewHeight - 8
+        );
+        const x = clamp(preferredX, 8, sourceWindow.clientWidth - chooserWidth - 8);
+        const preferredLeft = x - previewWidth - gap;
+        const previewX = preferredLeft >= 8
+          ? preferredLeft
+          : clamp(x + chooserWidth + gap, 8, sourceWindow.clientWidth - previewWidth - 8);
+        scrollCaptureChooser.style.left = `${x}px`;
+        scrollCaptureChooser.style.top = `${y}px`;
+        scrollCapturePreview.style.left = `${previewX}px`;
+        scrollCapturePreview.style.top = `${previewY}px`;
+        scrollCapturePreview.style.height = `${previewHeight}px`;
+      };
+
+      const showScrollCaptureChooser = () => {
+        positionScrollCaptureChooser();
+        scrollCaptureChooser.hidden = false;
+        scrollCapturePreview.hidden = false;
+        requestAnimationFrame(() => {
+          scrollCaptureChooser.classList.add('is-visible');
+          scrollCapturePreview.classList.add('is-visible');
+        });
+      };
+
+      const hideScrollCaptureUI = () => {
+        scrollCaptureChooser.classList.remove('is-visible');
+        scrollCapturePreview.classList.remove('is-visible');
+        scrollCaptureChooser.hidden = true;
+        scrollCapturePreview.hidden = true;
+      };
+
+      const showSelectionRequired = () => {
+        panelTitle.textContent = '先框选滚动内容区域';
+        panelSubtitle.textContent = '请在页面上按住并拖动，画出本次长截屏的范围';
+      };
+
+      const setImageOffset = () => {
+        const next = Math.max(0, Math.min(offset, maxOffset));
+        sourceImage.style.transform = `translateY(${-next}px)`;
+        if (state === 'capturing' && selection) {
+          const progress = maxOffset > 0 ? next / maxOffset : 0;
+          scrollCapturePreviewImage.style.objectPosition = `center ${progress * 100}%`;
+          positionScrollCaptureChooser();
+        }
+        frameCaption.textContent = state === 'capturing'
+            ? '正在截取'
+            : selection
+              ? '已选区域'
+              : '未选择区域';
+      };
+
+      // The prototype source is one continuous page image. Exporting a single
+      // crop from its unscrolled pixels models a de-duplicated stitched result:
+      // every source row appears once, even if the viewport paused while the
+      // person was scrolling.
+      const buildScrollCaptureCanvas = () => {
+        if (!selection || !sourceImage.naturalWidth || !sourceImage.naturalHeight) return null;
+        const displayWidth = sourceImage.getBoundingClientRect().width;
+        if (!displayWidth) return null;
+        const scale = sourceImage.naturalWidth / displayWidth;
+        const availableDisplayHeight = sourceImage.naturalHeight / scale;
+        const sourceX = clamp(selection.x, 0, displayWidth);
+        const sourceY = clamp(selection.y, 0, availableDisplayHeight);
+        const capturedWidth = clamp(selection.width, 1, displayWidth - sourceX);
+        const capturedHeight = clamp(
+          selection.height + maxCapturedOffset,
+          1,
+          availableDisplayHeight - sourceY
+        );
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(capturedWidth * scale));
+        canvas.height = Math.max(1, Math.round(capturedHeight * scale));
+        const context = canvas.getContext('2d');
+        if (!context) return null;
+        context.drawImage(
+          sourceImage,
+          Math.round(sourceX * scale),
+          Math.round(sourceY * scale),
+          canvas.width,
+          canvas.height,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+        return canvas;
+      };
+
+      const scrollCaptureDataURL = () => {
+        const canvas = buildScrollCaptureCanvas();
+        const dataURL = canvas?.toDataURL('image/png');
+        return dataURL?.startsWith('data:image/png;') ? dataURL : null;
+      };
+
+      const setScrollActionsBusy = (busy) => {
+        isCompleting = busy;
+        scrollCaptureChooser.setAttribute('aria-busy', String(busy));
+        scrollCaptureChooser.querySelectorAll('[data-scroll-capture-action]')
+          .forEach((button) => { button.disabled = busy; });
+      };
+
+      const recalculate = () => {
+        const imageHeight = sourceImage.getBoundingClientRect().height;
+        maxOffset = Math.max(1, imageHeight - sourcePage.clientHeight + 34);
+        offset = Math.min(offset, maxOffset);
+        updateScrollInputShields();
+        setImageOffset();
+      };
+
+      const setState = (nextState) => {
+        if (nextState === 'capturing' && !selection) {
+          showSelectionRequired();
+          return;
+        }
+        state = nextState;
+        root.dataset.state = nextState;
+        root.classList.toggle('capturing', nextState === 'capturing');
+        root.classList.remove('done');
+        selectionWindow.classList.remove('done');
+        stateButtons.forEach((button) => button.classList.toggle('active', button.dataset.stateButton === nextState));
+
+        if (nextState === 'select') {
+          offset = 0;
+          maxCapturedOffset = 0;
+          hideScrollCaptureUI();
+          eyebrow.textContent = '准备长截屏';
+          clearSelection();
+          panelTitle.textContent = '先框选滚动内容区域';
+          panelSubtitle.textContent = '按住并拖动鼠标，松开后锁定本次长截屏范围';
+          updateScrollInputShields();
+          setImageOffset();
+          return;
+        }
+
+        if (nextState === 'capturing') {
+          eyebrow.textContent = '正在记录';
+          panelTitle.textContent = '请在选区内手动向下滚动';
+          panelSubtitle.textContent = '灰色区域不会响应鼠标；请在选区内滚动，Captures 只记录确认到的移动';
+          showScrollCaptureChooser();
+          updateScrollInputShields();
+          setImageOffset();
+          return;
+        }
+      };
+
+      startButton.addEventListener('click', () => {
+        if (!selection) {
+          showSelectionRequired();
+          return;
+        }
+        setState('capturing');
+      });
+
+      scrollCaptureChooser.querySelectorAll('[data-scroll-capture-action]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          if (state !== 'capturing' || isCompleting) return;
+          const action = button.dataset.scrollCaptureAction;
+          if (action === 'cancel') {
+            setState('select');
+            announceScrollResult('已关闭长截屏，不会保存或复制');
+            return;
+          }
+          setScrollActionsBusy(true);
+          try {
+            const dataURL = scrollCaptureDataURL();
+            if (!dataURL) throw new Error('long capture export unavailable');
+            if (action === 'edit') {
+              setState('select');
+              window.CapturesPrototype?.openEditor(dataURL);
+              window.CapturesPrototype?.announce('已在图片编辑中打开长截屏');
+              return;
+            }
+            if (action === 'ocr') {
+              setState('select');
+              window.CapturesPrototype?.openEditor(dataURL);
+              window.CapturesPrototype?.announce('已把长截屏送入文字识别');
+              return;
+            }
+            if (action === 'save') {
+              const link = document.createElement('a');
+              link.href = dataURL;
+              link.download = `Captures-Long-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+              link.hidden = true;
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              setState('select');
+              announceScrollResult('已发起长截屏 PNG 下载');
+              return;
+            }
+            if (action === 'copy') {
+              if (!navigator.clipboard?.write || !window.ClipboardItem) {
+                throw new Error('image clipboard unavailable');
+              }
+              const blob = await (await fetch(dataURL)).blob();
+              await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+              setState('select');
+              announceScrollResult('已完成并复制长截屏');
+            }
+          } catch (_) {
+            announceScrollResult(
+              action === 'save'
+                ? '下载未能开始，长截屏仍保留，可再次尝试'
+                : action === 'copy'
+                  ? '浏览器未允许复制，长截屏仍保留'
+                  : '暂时无法准备长截屏结果，请重试'
+            );
+          } finally {
+            setScrollActionsBusy(false);
+          }
+        });
+      });
+      window.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || state !== 'capturing' || root.dataset.page !== 'scroll') return;
+        event.preventDefault();
+        setState('select');
+        announceScrollResult('已关闭长截屏，不会保存或复制');
+      });
+      window.addEventListener('captures-start-scroll-from-area', (event) => {
+        const normalized = event.detail?.selection;
+        if (!normalized) return;
+        setState('select');
+        const rect = {
+          x: clamp(normalized.x * sourceWindow.clientWidth, 0, sourceWindow.clientWidth),
+          y: clamp(normalized.y * sourceWindow.clientHeight, 0, sourceWindow.clientHeight),
+          width: clamp(normalized.width * sourceWindow.clientWidth, 24, sourceWindow.clientWidth),
+          height: clamp(normalized.height * sourceWindow.clientHeight, 24, sourceWindow.clientHeight),
+        };
+        rect.width = Math.min(rect.width, sourceWindow.clientWidth - rect.x);
+        rect.height = Math.min(rect.height, sourceWindow.clientHeight - rect.y);
+        applySelection(rect);
+        setState('capturing');
+      });
+      sourceWindow.addEventListener('pointerdown', (event) => {
+        if (state === 'capturing') {
+          // The native selection chrome is click-through. Captures does not
+          // intercept mouse or keyboard input during manual long capture.
+          return;
+        }
+        if (state !== 'select' || event.button !== 0) return;
+        dragOrigin = pointInSourceWindow(event);
+        isDragging = true;
+        sourceWindow.classList.add('is-dragging');
+        sourceWindow.setPointerCapture?.(event.pointerId);
+        clearSelection();
+        event.preventDefault();
+      });
+
+      sourceWindow.addEventListener('pointermove', (event) => {
+        if (state === 'capturing') {
+          return;
+        }
+        if (!isDragging || !dragOrigin) return;
+        const rect = rectFromPoints(dragOrigin, pointInSourceWindow(event));
+        if (rect.width >= 10 || rect.height >= 10) applySelection(rect);
+      });
+
+      const finishSelection = (event) => {
+        if (!isDragging || !dragOrigin) return;
+        const rect = rectFromPoints(dragOrigin, pointInSourceWindow(event));
+        isDragging = false;
+        dragOrigin = null;
+        sourceWindow.classList.remove('is-dragging');
+        sourceWindow.releasePointerCapture?.(event.pointerId);
+        if (rect.width < 80 || rect.height < 70) {
+          clearSelection();
+          showSelectionRequired();
+          return;
+        }
+        applySelection(rect);
+        setState('capturing');
+        event.preventDefault();
+      };
+
+      sourceWindow.addEventListener('pointerup', finishSelection);
+      sourceWindow.addEventListener('pointercancel', (event) => {
+        if (!isDragging) return;
+        isDragging = false;
+        dragOrigin = null;
+        sourceWindow.classList.remove('is-dragging');
+        if (sourceWindow.hasPointerCapture(event.pointerId)) sourceWindow.releasePointerCapture(event.pointerId);
+        clearSelection();
+      });
+      sourceWindow.addEventListener('wheel', (event) => {
+        if (state !== 'capturing') return;
+        if (!pointIsInsideSelection(pointInSourceWindow(event))) {
+          event.preventDefault();
+          return;
+        }
+        const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 18
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? sourcePage.clientHeight
+            : 1;
+        const delta = clamp(
+          event.deltaY * unit,
+          -sourcePage.clientHeight * 0.35,
+          sourcePage.clientHeight * 0.35
+        );
+        offset = clamp(offset + delta, 0, maxOffset);
+        maxCapturedOffset = Math.max(maxCapturedOffset, offset);
+        setImageOffset();
+        event.preventDefault();
+      }, { passive: false });
+
+      Object.values(scrollInputShields).forEach((shield) => {
+        ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'click', 'dblclick', 'contextmenu', 'wheel']
+          .forEach((eventName) => {
+            shield.addEventListener(eventName, (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }, { passive: false });
+          });
+      });
+
+      stateButtons.forEach((button) => button.addEventListener('click', () => {
+        const nextState = button.dataset.stateButton;
+        if (nextState !== 'select' && !selection) {
+          showSelectionRequired();
+          return;
+        }
+        setState(nextState);
+      }));
+      window.addEventListener('captures-mode-change', (event) => {
+        if (event.detail?.mode !== 'scroll') return;
+        // Returning to the scroll module always starts at the real user-flow
+        // entry point. The image editor must never leave a stale/blank state
+        // inside the scroll capture prototype.
+        if (state !== 'select') setState('select');
+        recalculate();
+      });
+      window.addEventListener('resize', recalculate);
+      sourceImage.addEventListener('load', recalculate);
+      recalculate();
+    })();
+  </script>
+  <script>
+    (() => {
+      const root = document.getElementById('prototype');
+      const workspace = document.getElementById('pinWorkspace');
+      const stage = document.getElementById('pinStage');
+      const source = document.getElementById('pinSource');
+      const sourceImage = document.getElementById('pinSourceImage');
+      const selection = document.getElementById('pinSelection');
+      const chooser = document.getElementById('postCaptureChooser');
+      const status = document.getElementById('pinStatus');
+      const newCaptureButton = document.getElementById('pinNewCapture');
+
+      if (!root || !workspace || !stage || !source || !sourceImage || !selection || !chooser || !status || !newCaptureButton) return;
+
+      const minimumSize = { width: 90, height: 70 };
+      let selecting = true;
+      let origin = null;
+      let draggingSelection = false;
+      let highestLayer = 10;
+      let drag = null;
+      let pendingSelection = null;
+      const markupCanvas = document.getElementById('quickMarkupCanvas');
+      const textInput = document.getElementById('quickMarkupText');
+      const colorInput = document.getElementById('quickMarkupColor');
+      const widthInput = document.getElementById('quickMarkupWidth');
+      const undoButton = document.getElementById('quickMarkupUndo');
+      const redoButton = document.getElementById('quickMarkupRedo');
+      const markupMessage = document.getElementById('quickMarkupMessage');
+      let frozenSource = null;
+      let frozenSize = null;
+      let quickTool = 'select';
+      let marks = [];
+      let undoMarks = [];
+      let redoMarks = [];
+      let markupGesture = null;
+      let selectedMark = null;
+      let nextMarkID = 1;
+      let textPoint = null;
+      let composingText = false;
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
+      const canAdjustCrop = () => marks.length === 0 && !textPoint;
+      const canMoveCropWithSelectionTool = () => canAdjustCrop() && quickTool === 'select';
+      const defaultMarkupCursor = () => quickTool === 'select' ? 'default' : quickTool === 'text' ? 'text' : 'crosshair';
+      const captureCards = () => [...stage.querySelectorAll('[data-floating-capture]')];
+
+      const updateDock = () => {
+        const count = captureCards().length;
+        if (pendingSelection) {
+          status.textContent = '选择这次截图的下一步 · 不改变默认设置';
+          newCaptureButton.textContent = '重新框选';
+          return;
+        }
+        if (selecting) {
+          status.textContent = '单击选中的窗口，或拖动框选区域';
+          newCaptureButton.textContent = '正在框选';
+          return;
+        }
+        status.textContent = count ? `已挂 ${count} 张截图` : '还没有挂起的截图';
+        newCaptureButton.textContent = count ? '再截一张' : '框选截图';
+      };
+
+      const setSelecting = (value) => {
+        resetMarkup();
+        selecting = value;
+        workspace.classList.toggle('is-selecting', value);
+        workspace.classList.remove('is-choosing');
+        pendingSelection = null;
+        chooser.classList.remove('is-visible');
+        chooser.hidden = true;
+        selection.classList.remove('is-visible');
+        selection.classList.remove('is-committed');
+        if (!value) selection.style.width = '0px';
+        updateDock();
+      };
+
+      const pointInSource = (event) => {
+        const bounds = source.getBoundingClientRect();
+        const x = event.clientX - bounds.left;
+        const y = event.clientY - bounds.top;
+        if (x < 0 || y < 0 || x > bounds.width || y > bounds.height) return null;
+        return { x, y };
+      };
+
+      const rectFrom = (start, end) => ({
+        x: Math.min(start.x, end.x),
+        y: Math.min(start.y, end.y),
+        width: Math.abs(end.x - start.x),
+        height: Math.abs(end.y - start.y),
+      });
+
+      const showSelection = (rect) => {
+        const sourceBounds = source.getBoundingClientRect();
+        const stageBounds = stage.getBoundingClientRect();
+        const scaleX = frozenSize ? sourceBounds.width / frozenSize.width : 1;
+        const scaleY = frozenSize ? sourceBounds.height / frozenSize.height : 1;
+        selection.style.left = `${sourceBounds.left - stageBounds.left + rect.x * scaleX}px`;
+        selection.style.top = `${sourceBounds.top - stageBounds.top + rect.y * scaleY}px`;
+        selection.style.width = `${rect.width * scaleX}px`;
+        selection.style.height = `${rect.height * scaleY}px`;
+        selection.classList.add('is-visible');
+      };
+
+      const fullSourceRect = () => {
+        const bounds = source.getBoundingClientRect();
+        return { x: 0, y: 0, width: bounds.width, height: bounds.height };
+      };
+
+      const showChooser = (rect) => {
+        const sourceBounds = source.getBoundingClientRect();
+        const stageBounds = stage.getBoundingClientRect();
+        chooser.hidden = false;
+        const chooserWidth = chooser.offsetWidth;
+        const chooserHeight = chooser.offsetHeight;
+        const gap = 10;
+        const insideInset = 8;
+        const selectionLeft = sourceBounds.left - stageBounds.left + rect.x * (frozenSize ? sourceBounds.width / frozenSize.width : 1);
+        const selectionTop = sourceBounds.top - stageBounds.top + rect.y * (frozenSize ? sourceBounds.height / frozenSize.height : 1);
+        const outsideAbove = selectionTop - chooserHeight - gap;
+        const selectionHeight = rect.height * (frozenSize ? sourceBounds.height / frozenSize.height : 1);
+        const outsideBelow = selectionTop + selectionHeight + gap;
+        const canPlaceAbove = outsideAbove >= 10;
+        const canPlaceBelow = outsideBelow + chooserHeight <= stage.clientHeight - 10;
+        const isInside = !canPlaceAbove && !canPlaceBelow;
+        const preferredLeft = selectionLeft + (isInside ? insideInset : 0);
+        const top = canPlaceAbove ? outsideAbove : canPlaceBelow ? outsideBelow : selectionTop + insideInset;
+
+        chooser.style.left = `${clamp(preferredLeft, 10, stage.clientWidth - chooserWidth - 10)}px`;
+        chooser.style.top = `${clamp(top, 10, stage.clientHeight - chooserHeight - 10)}px`;
+        chooser.classList.add('is-visible');
+      };
+
+      const presentPostCaptureChoice = (rect) => {
+        resetMarkup();
+        frozenSource = cropSelection(fullSourceRect());
+        frozenSize = fullSourceRect();
+        selecting = false;
+        pendingSelection = rect;
+        workspace.classList.remove('is-selecting');
+        workspace.classList.add('is-choosing');
+        selection.classList.add('is-visible', 'is-committed');
+        showSelection(rect);
+        renderMarkup();
+        showChooser(rect);
+        updateDock();
+      };
+
+      const cropSelection = (rect) => {
+        const bounds = source.getBoundingClientRect();
+        const naturalWidth = sourceImage.naturalWidth || bounds.width;
+        const naturalHeight = sourceImage.naturalHeight || bounds.height;
+        const scale = Math.max(bounds.width / naturalWidth, bounds.height / naturalHeight);
+        const renderedWidth = naturalWidth * scale;
+        const renderedHeight = naturalHeight * scale;
+        const offsetX = (bounds.width - renderedWidth) * .5;
+        const offsetY = (bounds.height - renderedHeight) * .09;
+        const canvas = document.createElement('canvas');
+        const density = Math.min(2, window.devicePixelRatio || 1);
+        canvas.width = Math.max(1, Math.round(rect.width * density));
+        canvas.height = Math.max(1, Math.round(rect.height * density));
+        const context = canvas.getContext('2d');
+        if (!context) return null;
+        if (frozenSource && frozenSize) {
+          const sourceDensity = frozenSource.width / frozenSize.width;
+          context.drawImage(frozenSource, rect.x * sourceDensity, rect.y * sourceDensity, rect.width * sourceDensity, rect.height * sourceDensity, 0, 0, canvas.width, canvas.height);
+          context.scale(canvas.width / rect.width, canvas.height / rect.height);
+          context.translate(-rect.x, -rect.y);
+          marks.forEach((mark) => drawMark(context, mark));
+          return canvas;
+        }
+        context.drawImage(
+          sourceImage,
+          (rect.x - offsetX) / scale,
+          (rect.y - offsetY) / scale,
+          rect.width / scale,
+          rect.height / scale,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+        return canvas;
+      };
+
+      const finishPostCaptureChoice = () => {
+        resetMarkup();
+        pendingSelection = null;
+        workspace.classList.remove('is-choosing');
+        chooser.classList.remove('is-visible');
+        chooser.hidden = true;
+        selection.classList.remove('is-visible', 'is-committed');
+        selection.style.width = '0px';
+        updateDock();
+      };
+
+      // Marks stay in the frozen desktop's coordinates. The crop can be resized
+      // only before the first mark; only the final composited crop is exported.
+      const copyMarks = () => structuredClone(marks);
+      const resetMarkup = () => {
+        markupMessage.hidden = true;
+        markupMessage.textContent = '';
+        markupGesture = null;
+        textPoint = null;
+        composingText = false;
+        textInput.value = '';
+        textInput.hidden = true;
+        markupCanvas.hidden = true;
+        frozenSource = null;
+        frozenSize = null;
+        marks = [];
+        undoMarks = [];
+        redoMarks = [];
+        selectedMark = null;
+        quickTool = 'select';
+        updateMarkupControls();
+      };
+      const updateMarkupControls = () => {
+        chooser.querySelectorAll('[data-quick-tool]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.quickTool === quickTool)));
+        undoButton.disabled = undoMarks.length === 0;
+        redoButton.disabled = redoMarks.length === 0;
+        const longCapture = chooser.querySelector('[data-post-capture-action="scroll"]');
+        longCapture.disabled = marks.length > 0 || !!textPoint;
+        longCapture.title = longCapture.disabled ? '请先撤销全部标注，再开始长截屏' : '使用当前选区开始长截屏';
+        longCapture.setAttribute('aria-label', longCapture.title);
+        const cropIsAdjustable = canAdjustCrop();
+        const selectToolButton = chooser.querySelector('[data-quick-tool="select"]');
+        if (selectToolButton) {
+          const selectToolLabel = cropIsAdjustable
+            ? (quickTool === 'select'
+              ? '选择和移动 (V)；当前可拖动截图范围'
+              : '选择和移动 (V)；切换后可拖动截图范围')
+            : '选择和移动标注 (V)；截图范围已锁定';
+          selectToolButton.setAttribute('aria-label', selectToolLabel);
+          selectToolButton.title = selectToolLabel;
+        }
+        selection.dataset.cropAdjustable = String(cropIsAdjustable);
+        markupCanvas.setAttribute(
+          'aria-label',
+          cropIsAdjustable
+            ? (canMoveCropWithSelectionTool()
+              ? '截图快速标注画布。选择和移动工具已选中；尚无标注，可从选区内部拖动整体范围，拖动边缘或四角可调整大小。'
+              : '截图快速标注画布。尚无标注；当前工具会开始绘制标注。选区仍可拖动边缘或四角调整大小；切回选择和移动可从内部拖动整体范围。')
+            : '截图快速标注画布。选框已锁定；撤销全部标注后可再次调整范围。'
+        );
+        markupCanvas.style.cursor = defaultMarkupCursor();
+      };
+      const markBounds = (mark) => {
+        if (mark.type === 'text') {
+          const lines = mark.text.split('\n');
+          const context = markupCanvas.getContext('2d');
+          context.font = `${mark.fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          return { x: mark.start.x, y: mark.start.y, width: Math.max(...lines.map((line) => context.measureText(line).width), 12), height: lines.length * mark.fontSize * 1.25 };
+        }
+        const points = mark.points || [mark.start, mark.end];
+        const xs = points.map((point) => point.x);
+        const ys = points.map((point) => point.y);
+        return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+      };
+      const drawMark = (context, mark) => {
+        const rect = markBounds(mark);
+        context.save();
+        context.strokeStyle = mark.color;
+        context.fillStyle = mark.color;
+        context.lineWidth = mark.width;
+        context.lineCap = 'round';
+        context.lineJoin = 'round';
+        if (mark.type === 'text') {
+          context.font = `${mark.fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          context.textBaseline = 'top';
+          mark.text.split('\n').forEach((line, index) => context.fillText(line, mark.start.x, mark.start.y + index * mark.fontSize * 1.25));
+        } else if (mark.type === 'pixelate' && rect.width > 0 && rect.height > 0) {
+          const sample = document.createElement('canvas');
+          sample.width = Math.max(1, Math.ceil(rect.width / 10));
+          sample.height = Math.max(1, Math.ceil(rect.height / 10));
+          const density = frozenSource.width / frozenSize.width;
+          sample.getContext('2d').drawImage(frozenSource, rect.x * density, rect.y * density, rect.width * density, rect.height * density, 0, 0, sample.width, sample.height);
+          context.imageSmoothingEnabled = false;
+          context.drawImage(sample, rect.x, rect.y, rect.width, rect.height);
+        } else {
+          context.beginPath();
+          if (mark.type === 'rectangle') context.rect(rect.x, rect.y, rect.width, rect.height);
+          else if (mark.type === 'ellipse') context.ellipse(rect.x + rect.width / 2, rect.y + rect.height / 2, Math.max(.1, rect.width / 2), Math.max(.1, rect.height / 2), 0, 0, Math.PI * 2);
+          else {
+            const points = mark.points || [mark.start, mark.end];
+            context.moveTo(points[0].x, points[0].y);
+            points.slice(1).forEach((point) => context.lineTo(point.x, point.y));
+            if (mark.type === 'arrow') {
+              const angle = Math.atan2(mark.end.y - mark.start.y, mark.end.x - mark.start.x);
+              const head = Math.max(12, mark.width * 3);
+              [-.55, .55].forEach((offset) => { context.moveTo(mark.end.x, mark.end.y); context.lineTo(mark.end.x - head * Math.cos(angle + offset), mark.end.y - head * Math.sin(angle + offset)); });
+            }
+          }
+          context.stroke();
+        }
+        context.restore();
+      };
+      const renderMarkup = () => {
+        if (!pendingSelection || !frozenSource) return;
+        const bounds = source.getBoundingClientRect();
+        const stageBounds = stage.getBoundingClientRect();
+        markupCanvas.hidden = false;
+        markupCanvas.style.left = `${bounds.left - stageBounds.left}px`;
+        markupCanvas.style.top = `${bounds.top - stageBounds.top}px`;
+        markupCanvas.style.width = `${bounds.width}px`;
+        markupCanvas.style.height = `${bounds.height}px`;
+        markupCanvas.width = frozenSource.width;
+        markupCanvas.height = frozenSource.height;
+        const context = markupCanvas.getContext('2d');
+        context.scale(frozenSource.width / frozenSize.width, frozenSource.height / frozenSize.height);
+        context.drawImage(frozenSource, 0, 0, frozenSize.width, frozenSize.height);
+        marks.forEach((mark) => drawMark(context, mark));
+        if (markupGesture?.draft) drawMark(context, markupGesture.draft);
+        const chosen = marks.find((mark) => mark.id === selectedMark);
+        if (chosen && quickTool === 'select') {
+          const rect = markBounds(chosen);
+          context.strokeStyle = '#007aff';
+          context.lineWidth = 1;
+          context.setLineDash([4, 3]);
+          context.strokeRect(rect.x - 5, rect.y - 5, rect.width + 10, rect.height + 10);
+        }
+        updateMarkupControls();
+      };
+      const saveMarkChange = (before) => {
+        undoMarks.push(before);
+        redoMarks = [];
+        renderMarkup();
+      };
+      const commitText = (cancel = false) => {
+        if (!textPoint) return;
+        const point = textPoint;
+        const value = textInput.value.trim();
+        textPoint = null;
+        textInput.hidden = true;
+        textInput.value = '';
+        if (!cancel && value) {
+          const before = copyMarks();
+          marks.push({ id: nextMarkID++, type: 'text', start: point, text: value, color: colorInput.value, width: +widthInput.value, fontSize: 20 });
+          saveMarkChange(before);
+        } else renderMarkup();
+      };
+      const chooseTool = (tool) => {
+        commitText();
+        quickTool = tool;
+        selectedMark = null;
+        renderMarkup();
+      };
+      chooser.querySelectorAll('[data-quick-tool]').forEach((button) => button.addEventListener('click', () => chooseTool(button.dataset.quickTool)));
+      chooser.querySelectorAll('button[aria-label]').forEach((button) => { button.title = button.getAttribute('aria-label'); });
+      undoButton.addEventListener('click', () => {
+        commitText();
+        if (!undoMarks.length) return;
+        redoMarks.push(copyMarks());
+        marks = undoMarks.pop();
+        selectedMark = null;
+        renderMarkup();
+      });
+      redoButton.addEventListener('click', () => {
+        commitText();
+        if (!redoMarks.length) return;
+        undoMarks.push(copyMarks());
+        marks = redoMarks.pop();
+        selectedMark = null;
+        renderMarkup();
+      });
+      textInput.addEventListener('compositionstart', () => { composingText = true; });
+      textInput.addEventListener('compositionend', () => { composingText = false; });
+      textInput.addEventListener('blur', () => commitText());
+      textInput.addEventListener('keydown', (event) => {
+        event.stopPropagation();
+        if (event.isComposing || composingText || event.keyCode === 229) return;
+        if (event.key === 'Escape' || (event.key === 'Enter' && (event.metaKey || event.ctrlKey))) {
+          event.preventDefault();
+          commitText(event.key === 'Escape');
+        }
+      });
+      const markupPoint = (event) => {
+        const bounds = markupCanvas.getBoundingClientRect();
+        return { x: clamp((event.clientX - bounds.left) * frozenSize.width / bounds.width, 0, frozenSize.width), y: clamp((event.clientY - bounds.top) * frozenSize.height / bounds.height, 0, frozenSize.height) };
+      };
+      const insideRect = (point, rect, inset = 0) => point.x >= rect.x - inset && point.x <= rect.x + rect.width + inset && point.y >= rect.y - inset && point.y <= rect.y + rect.height + inset;
+      const cropEdges = (point) => {
+        const rect = pendingSelection;
+        const threshold = 12 * frozenSize.width / markupCanvas.getBoundingClientRect().width;
+        return { left: Math.abs(point.x - rect.x) < threshold, right: Math.abs(point.x - rect.x - rect.width) < threshold, top: Math.abs(point.y - rect.y) < threshold, bottom: Math.abs(point.y - rect.y - rect.height) < threshold };
+      };
+      const cropResizeCursor = (edges) => {
+        if ((edges.left && edges.top) || (edges.right && edges.bottom)) return 'nwse-resize';
+        if ((edges.right && edges.top) || (edges.left && edges.bottom)) return 'nesw-resize';
+        if (edges.left || edges.right) return 'ew-resize';
+        if (edges.top || edges.bottom) return 'ns-resize';
+        return null;
+      };
+      markupCanvas.addEventListener('pointerdown', (event) => {
+        if (!pendingSelection || event.button !== 0 || markupGesture) return;
+        commitText();
+        const point = markupPoint(event);
+        const resizeEdges = canAdjustCrop() && insideRect(point, pendingSelection, 12) ? cropEdges(point) : null;
+        const resizeCursor = resizeEdges ? cropResizeCursor(resizeEdges) : null;
+        if (!insideRect(point, pendingSelection, resizeCursor ? 12 : 0)) return;
+        markupCanvas.focus({ preventScroll: true });
+        if (resizeCursor) {
+          markupGesture = { pointerId: event.pointerId, start: point, rect: { ...pendingSelection }, edges: resizeEdges };
+        } else if (quickTool === 'text') {
+          textPoint = point;
+          const bounds = source.getBoundingClientRect();
+          const stageBounds = stage.getBoundingClientRect();
+          textInput.hidden = false;
+          textInput.style.left = `${clamp(bounds.left - stageBounds.left + point.x * bounds.width / frozenSize.width, 10, stage.clientWidth - 160)}px`;
+          textInput.style.top = `${clamp(bounds.top - stageBounds.top + point.y * bounds.height / frozenSize.height, 10, stage.clientHeight - 60)}px`;
+          textInput.focus();
+          updateMarkupControls();
+        } else if (quickTool === 'select') {
+          if (canMoveCropWithSelectionTool()) {
+            markupGesture = { pointerId: event.pointerId, start: point, rect: { ...pendingSelection }, movingCrop: true };
+          } else {
+            const hit = [...marks].reverse().find((mark) => insideRect(point, markBounds(mark), 8));
+            selectedMark = hit?.id || null;
+            if (hit) markupGesture = { pointerId: event.pointerId, start: point, before: copyMarks(), moving: hit.id };
+          }
+          renderMarkup();
+          if (markupGesture?.movingCrop) markupCanvas.style.cursor = 'grabbing';
+        } else {
+          const draft = { id: nextMarkID++, type: quickTool, start: point, end: point, color: colorInput.value, width: +widthInput.value };
+          if (quickTool === 'pencil') draft.points = [point];
+          markupGesture = { pointerId: event.pointerId, start: point, draft };
+        }
+        if (markupGesture) markupCanvas.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      markupCanvas.addEventListener('pointermove', (event) => {
+        if (!pendingSelection) return;
+        const point = markupPoint(event);
+        if (!markupGesture) {
+          const edges = canAdjustCrop() && insideRect(point, pendingSelection, 12) ? cropEdges(point) : null;
+          markupCanvas.style.cursor = edges
+            ? (cropResizeCursor(edges) || defaultMarkupCursor())
+            : (canMoveCropWithSelectionTool() && insideRect(point, pendingSelection) ? 'grab' : defaultMarkupCursor());
+          return;
+        }
+        if (event.pointerId !== markupGesture.pointerId) return;
+        const dx = point.x - markupGesture.start.x;
+        const dy = point.y - markupGesture.start.y;
+        if (markupGesture.movingCrop) {
+          const rect = markupGesture.rect;
+          pendingSelection = {
+            x: clamp(rect.x + dx, 0, frozenSize.width - rect.width),
+            y: clamp(rect.y + dy, 0, frozenSize.height - rect.height),
+            width: rect.width,
+            height: rect.height,
+          };
+          showSelection(pendingSelection);
+          showChooser(pendingSelection);
+        } else if (markupGesture.rect) {
+          const rect = markupGesture.rect;
+          const edges = markupGesture.edges;
+          const left = edges.left ? clamp(rect.x + dx, 0, rect.x + rect.width - minimumSize.width) : rect.x;
+          const top = edges.top ? clamp(rect.y + dy, 0, rect.y + rect.height - minimumSize.height) : rect.y;
+          const right = edges.right ? clamp(rect.x + rect.width + dx, left + minimumSize.width, frozenSize.width) : rect.x + rect.width;
+          const bottom = edges.bottom ? clamp(rect.y + rect.height + dy, top + minimumSize.height, frozenSize.height) : rect.y + rect.height;
+          pendingSelection = { x: left, y: top, width: right - left, height: bottom - top };
+          showSelection(pendingSelection);
+          showChooser(pendingSelection);
+        } else if (markupGesture.moving) {
+          marks = structuredClone(markupGesture.before);
+          const mark = marks.find((candidate) => candidate.id === markupGesture.moving);
+          const rect = markBounds(mark);
+          const moveX = clamp(dx, pendingSelection.x - rect.x, pendingSelection.x + pendingSelection.width - rect.x - rect.width);
+          const moveY = clamp(dy, pendingSelection.y - rect.y, pendingSelection.y + pendingSelection.height - rect.y - rect.height);
+          const translated = (vertex) => ({ x: vertex.x + moveX, y: vertex.y + moveY });
+          mark.start = translated(mark.start);
+          if (mark.end) mark.end = translated(mark.end);
+          if (mark.points) mark.points = mark.points.map(translated);
+        } else {
+          const clipped = { x: clamp(point.x, pendingSelection.x, pendingSelection.x + pendingSelection.width), y: clamp(point.y, pendingSelection.y, pendingSelection.y + pendingSelection.height) };
+          markupGesture.draft.end = clipped;
+          markupGesture.draft.points?.push(clipped);
+        }
+        renderMarkup();
+      });
+      const finishMarkupGesture = (event, cancelled = false) => {
+        if (!markupGesture || event.pointerId !== markupGesture.pointerId) return;
+        const gesture = markupGesture;
+        markupGesture = null;
+        if (markupCanvas.hasPointerCapture(event.pointerId)) markupCanvas.releasePointerCapture(event.pointerId);
+        if (cancelled) {
+          if (gesture.before) marks = gesture.before;
+          if (gesture.rect) pendingSelection = gesture.rect;
+        } else if (gesture.draft) {
+          const rect = markBounds(gesture.draft);
+          if (rect.width > 2 || rect.height > 2) {
+            const before = copyMarks();
+            marks.push(gesture.draft);
+            saveMarkChange(before);
+          }
+        } else if (gesture.before && JSON.stringify(gesture.before) !== JSON.stringify(marks)) saveMarkChange(gesture.before);
+        showSelection(pendingSelection);
+        showChooser(pendingSelection);
+        renderMarkup();
+      };
+      markupCanvas.addEventListener('pointerup', (event) => finishMarkupGesture(event));
+      markupCanvas.addEventListener('pointercancel', (event) => finishMarkupGesture(event, true));
+      window.addEventListener('resize', () => {
+        if (!pendingSelection) return;
+        commitText();
+        showSelection(pendingSelection);
+        showChooser(pendingSelection);
+        renderMarkup();
+      });
+
+      const bringToFront = (card) => {
+        highestLayer += 1;
+        card.style.zIndex = String(highestLayer);
+      };
+
+      const refreshCardCount = () => updateDock();
+
+      const beginCardDrag = (event, card) => {
+        if (event.button !== 0) return;
+        bringToFront(card);
+        drag = {
+          card,
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          left: parseFloat(card.style.left) || 0,
+          top: parseFloat(card.style.top) || 0,
+        };
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        event.preventDefault();
+      };
+
+      const moveCard = (event) => {
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        const maxLeft = Math.max(0, stage.clientWidth - drag.card.offsetWidth);
+        const maxTop = Math.max(0, stage.clientHeight - drag.card.offsetHeight);
+        drag.card.style.left = `${clamp(drag.left + event.clientX - drag.startX, 0, maxLeft)}px`;
+        drag.card.style.top = `${clamp(drag.top + event.clientY - drag.startY, 0, maxTop)}px`;
+      };
+
+      const finishCardDrag = (event) => {
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        if (event.type === 'pointercancel') {
+          drag.card.style.left = `${drag.left}px`;
+          drag.card.style.top = `${drag.top}px`;
+        }
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        drag = null;
+      };
+
+      const createCaptureCard = (rect) => {
+        const sourceBounds = source.getBoundingClientRect();
+        const stageBounds = stage.getBoundingClientRect();
+        const capturedCanvas = cropSelection(rect);
+        const capturedSource = capturedCanvas?.toDataURL('image/png');
+        const card = document.createElement('article');
+        card.className = 'floating-capture';
+        card.dataset.floatingCapture = 'true';
+        card.tabIndex = 0;
+        card.setAttribute('aria-label', '已挂起截图。拖动图片可移动；左上角红色按钮关闭；右上角可编辑、识别文字或切换置顶。');
+        card.style.width = `${rect.width}px`;
+        card.style.height = `${rect.height}px`;
+        card.style.left = `${sourceBounds.left - stageBounds.left + rect.x}px`;
+        card.style.top = `${sourceBounds.top - stageBounds.top + rect.y}px`;
+
+        const preview = document.createElement('div');
+        preview.className = 'floating-capture__preview';
+        const image = new Image();
+        image.src = capturedSource || sourceImage.src;
+        image.alt = '';
+        image.style.width = '100%';
+        image.style.height = '100%';
+        image.style.left = '0';
+        image.style.top = '0';
+        image.style.objectFit = 'fill';
+        preview.appendChild(image);
+
+        preview.setAttribute('aria-label', '拖动截图');
+        preview.addEventListener('pointerdown', (event) => beginCardDrag(event, card));
+        preview.addEventListener('pointermove', moveCard);
+        preview.addEventListener('pointerup', finishCardDrag);
+        preview.addEventListener('pointercancel', finishCardDrag);
+
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'floating-capture__close';
+        close.setAttribute('aria-label', '关闭这张截图');
+        close.textContent = '×';
+        close.addEventListener('pointerdown', (event) => event.stopPropagation());
+        close.addEventListener('click', () => {
+          card.remove();
+          refreshCardCount();
+        });
+
+        const actions = document.createElement('div');
+        actions.className = 'floating-capture__actions';
+
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'floating-capture__action';
+        edit.setAttribute('aria-label', '打开截图编辑');
+        edit.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13l2.8-.7L13 5.1 10.9 3 3.7 10.2 3 13Z"></path><path d="M9.8 4.1l2.1 2.1"></path></svg><span>编辑</span>';
+        edit.addEventListener('pointerdown', (event) => event.stopPropagation());
+        edit.addEventListener('click', () => {
+          window.CapturesPrototype?.openEditor(capturedSource || sourceImage);
+        });
+
+        const ocr = document.createElement('button');
+        ocr.type = 'button';
+        ocr.className = 'floating-capture__action';
+        ocr.setAttribute('aria-label', '识别截图中的文字');
+        ocr.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h3M3 3v3M13 3h-3M13 3v3M3 13h3M3 13v-3M13 13h-3M13 13v-3"></path><path d="M6 6.5h4M8 6.5v4"></path></svg><span>OCR</span>';
+        ocr.addEventListener('pointerdown', (event) => event.stopPropagation());
+        ocr.addEventListener('click', () => {
+          const active = ocr.classList.toggle('is-active');
+          ocr.setAttribute('aria-pressed', String(active));
+          window.CapturesPrototype?.announce(active ? '原型：已请求文字识别' : '原型：已收起文字识别');
+        });
+
+        const pin = document.createElement('button');
+        pin.type = 'button';
+        pin.className = 'floating-capture__action';
+        pin.setAttribute('aria-label', '置顶截图');
+        pin.setAttribute('aria-pressed', 'false');
+        pin.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4l-.6 4 2.1 2v1H4.5V8l2.1-2L6 2Z"></path><path d="M8 9v5"></path></svg><span>置顶</span>';
+        pin.addEventListener('pointerdown', (event) => event.stopPropagation());
+        pin.addEventListener('click', () => {
+          const active = pin.classList.toggle('is-active');
+          pin.setAttribute('aria-pressed', String(active));
+          pin.setAttribute('aria-label', active ? '取消置顶截图' : '置顶截图');
+          window.CapturesPrototype?.announce(active ? '截图已置顶' : '截图将按普通窗口层级显示');
+        });
+
+        actions.append(edit, ocr, pin);
+        card.append(preview, actions, close);
+        card.addEventListener('pointerdown', () => bringToFront(card));
+        stage.appendChild(card);
+        bringToFront(card);
+      };
+
+      stage.addEventListener('pointerdown', (event) => {
+        if (!selecting || event.button !== 0 || event.target.closest('[data-floating-capture], #pinNewCapture')) return;
+        if (!event.target.closest('#pinSource')) return;
+        const point = pointInSource(event);
+        if (!point) return;
+        origin = point;
+        draggingSelection = true;
+        stage.setPointerCapture?.(event.pointerId);
+        selection.classList.remove('is-visible');
+        event.preventDefault();
+      });
+
+      stage.addEventListener('pointermove', (event) => {
+        if (draggingSelection && origin) {
+          const point = pointInSource(event);
+          if (!point) return;
+          showSelection(rectFrom(origin, point));
+          return;
+        }
+        if (!selecting || pendingSelection) return;
+        if (event.target.closest('#pinSource')) {
+          showSelection(fullSourceRect());
+        } else {
+          selection.classList.remove('is-visible');
+        }
+      });
+
+      const finishSelection = (event) => {
+        if (!draggingSelection || !origin) return;
+        const point = pointInSource(event);
+        const rect = point && rectFrom(origin, point);
+        draggingSelection = false;
+        origin = null;
+        stage.releasePointerCapture?.(event.pointerId);
+        if (!rect || rect.width < minimumSize.width || rect.height < minimumSize.height) {
+          presentPostCaptureChoice(fullSourceRect());
+          return;
+        }
+        presentPostCaptureChoice(rect);
+      };
+
+      stage.addEventListener('pointerup', finishSelection);
+      stage.addEventListener('pointercancel', (event) => {
+        if (!draggingSelection) return;
+        draggingSelection = false;
+        origin = null;
+        if (stage.hasPointerCapture(event.pointerId)) stage.releasePointerCapture(event.pointerId);
+        selection.classList.remove('is-visible');
+      });
+      newCaptureButton.addEventListener('click', () => setSelecting(true));
+      chooser.querySelectorAll('[data-post-capture-action]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          if (!pendingSelection) return;
+          commitText();
+          const rect = pendingSelection;
+          const action = button.dataset.postCaptureAction;
+          if (action === 'close') {
+            setSelecting(true);
+            window.CapturesPrototype?.announce('已关闭这次截图，不会保存或复制');
+            return;
+          }
+          if (action === 'edit') {
+            const canvas = cropSelection(rect);
+            finishPostCaptureChoice();
+            window.CapturesPrototype?.openEditor(canvas?.toDataURL('image/png') || sourceImage);
+            return;
+          }
+          if (action === 'pin') {
+            createCaptureCard(rect);
+            finishPostCaptureChoice();
+            return;
+          }
+          if (action === 'save') {
+            let link = null;
+            try {
+              const canvas = cropSelection(rect);
+              const imageURL = canvas?.toDataURL('image/png');
+              if (!imageURL?.startsWith('data:image/png;')) throw new Error('PNG export unavailable');
+              link = document.createElement('a');
+              link.href = imageURL;
+              link.download = `Captures-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+              link.hidden = true;
+              document.body.appendChild(link);
+              link.click();
+              // Browser download dispatch is the prototype's commit boundary;
+              // it cannot inspect the user's download folder or browser policy.
+              finishPostCaptureChoice();
+              status.textContent = '已发起 PNG 下载 · 默认设置未改变';
+              newCaptureButton.textContent = '再截一张';
+            } catch (_) {
+              markupMessage.textContent = '下载未能开始。选区和标注已保留，请重试。';
+              markupMessage.hidden = false;
+              showChooser(rect);
+            } finally {
+              link?.remove();
+            }
+            return;
+          }
+          if (action === 'copy') {
+            const canvas = cropSelection(rect);
+            let copied = false;
+            if (canvas && navigator.clipboard?.write && window.ClipboardItem) {
+              try {
+                const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+                if (blob) {
+                  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                  copied = true;
+                }
+              } catch (_) {
+                copied = false;
+              }
+            }
+            if (pendingSelection !== rect) return;
+            finishPostCaptureChoice();
+            status.textContent = copied ? '这次截图已复制 · 默认设置未改变' : '原型：已选择复制 · 默认设置未改变';
+            newCaptureButton.textContent = '再截一张';
+            return;
+          }
+          if (action === 'ocr') {
+            const canvas = cropSelection(rect);
+            finishPostCaptureChoice();
+            window.CapturesPrototype?.openEditor(canvas?.toDataURL('image/png') || sourceImage);
+            window.CapturesPrototype?.announce('已进入文字识别');
+            return;
+          }
+          if (action === 'scroll') {
+            if (marks.length) return;
+            const bounds = frozenSize || source.getBoundingClientRect();
+            const normalizedSelection = {
+              x: rect.x / bounds.width,
+              y: rect.y / bounds.height,
+              width: rect.width / bounds.width,
+              height: rect.height / bounds.height,
+            };
+            finishPostCaptureChoice();
+            window.CapturesPrototype?.openScroll(normalizedSelection);
+          }
+        });
+      });
+      window.addEventListener('keydown', (event) => {
+        if (!pendingSelection || root.dataset.page !== 'pin') return;
+        if (event.isComposing || composingText || event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+        const shortcut = event.key.toLowerCase();
+        if ((event.metaKey || event.ctrlKey) && shortcut === 'z') {
+          event.preventDefault();
+          (event.shiftKey ? redoButton : undoButton).click();
+          return;
+        }
+        if ((event.metaKey || event.ctrlKey) && shortcut === 's') {
+          event.preventDefault();
+          chooser.querySelector('[data-post-capture-action="save"]')?.click();
+          return;
+        }
+        if (!event.metaKey && !event.ctrlKey) {
+          const quickShortcut = { v: 'select', r: 'rectangle', e: 'ellipse', a: 'arrow', p: 'pencil', t: 'text', x: 'pixelate' }[shortcut];
+          if (quickShortcut && !event.altKey) {
+            event.preventDefault();
+            chooseTool(quickShortcut);
+            return;
+          }
+          if ((event.key === 'Backspace' || event.key === 'Delete') && selectedMark) {
+            event.preventDefault();
+            const before = copyMarks();
+            marks = marks.filter((mark) => mark.id !== selectedMark);
+            selectedMark = null;
+            saveMarkChange(before);
+            return;
+          }
+        }
+        if (event.key === 'Enter' && event.target.closest('button')) return;
+        const action = ((event.metaKey || event.ctrlKey) && shortcut === 'c') || event.key === 'Enter' ? 'copy' : null;
+        if (action) {
+          event.preventDefault();
+          chooser.querySelector(`[data-post-capture-action="${action}"]`)?.click();
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          chooser.querySelector('[data-post-capture-action="close"]')?.click();
+        }
+      });
+      window.addEventListener('captures-page-change', (event) => {
+        if (event.detail?.page === 'pin') updateDock();
+      });
+
+      setSelecting(true);
+    })();
+  </script>
+</body>
+</html>

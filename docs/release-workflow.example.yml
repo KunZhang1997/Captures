@@ -1,0 +1,295 @@
+# Non-executing reference. No release automation is installed by this file.
+name: Release example
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          PROJECT_VERSION="$(sed -n 's/^[[:space:]]*MARKETING_VERSION: "\(.*\)"/\1/p' project.yml | head -n1)"
+          if [ -z "$PROJECT_VERSION" ]; then
+            echo "Failed to determine MARKETING_VERSION" >&2
+            exit 1
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="$PROJECT_VERSION"
+          fi
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must use major.minor.patch format: $VERSION" >&2
+            exit 1
+          fi
+
+          if [ "$VERSION" != "$PROJECT_VERSION" ]; then
+            echo "Requested version $VERSION does not match project version $PROJECT_VERSION" >&2
+            exit 1
+          fi
+
+          TAG="v$VERSION"
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && [ "$GITHUB_REF_NAME" != "$TAG" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match project version $VERSION (expected $TAG)" >&2
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Resolve package dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -scheme Captures \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm"
+
+      - name: Import signing certificate
+        id: signing
+        env:
+          HAS_CERT: ${{ secrets.CERTIFICATE_P12 != '' }}
+          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          if [ "$HAS_CERT" != "true" ]; then
+            echo "CERTIFICATE_P12 is required; refusing to create an unsigned release." >&2
+            exit 1
+          fi
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security default-keychain -d user -s "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | sed -n 's/.*"\(.*\)"/\1/p' | grep '^Developer ID Application:' | head -n1)"
+          if [ -z "$IDENTITY" ]; then
+            echo "No Developer ID Application identity found in imported keychain" >&2
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+            exit 1
+          fi
+
+          echo "identity=$IDENTITY" >> $GITHUB_OUTPUT
+          echo "keychain=$KEYCHAIN_PATH" >> $GITHUB_OUTPUT
+
+      - name: Build release
+        run: |
+          SIGN_FLAGS=(
+            CODE_SIGN_STYLE=Manual
+            "CODE_SIGN_IDENTITY=${{ steps.signing.outputs.identity }}"
+            "OTHER_CODE_SIGN_FLAGS=--keychain ${{ steps.signing.outputs.keychain }}"
+          )
+
+          xcodebuild build \
+            -scheme Captures \
+            -destination 'platform=macOS' \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/build" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm" \
+            MARKETING_VERSION="${{ steps.version.outputs.VERSION }}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            "${SIGN_FLAGS[@]}"
+
+      - name: Sign for distribution
+        env:
+          IDENTITY: ${{ steps.signing.outputs.identity }}
+          KEYCHAIN: ${{ steps.signing.outputs.keychain }}
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/build/Build/Products/Release/Captures.app"
+          ENT="Captures/Resources/Captures.entitlements"
+
+          # Re-sign a nested item, preserving its existing entitlements when it has any.
+          sign_item() {
+            local item="$1"
+            local ent; ent="$(mktemp).plist"
+            if codesign -d --entitlements "$ent" --xml "$item" >/dev/null 2>&1 \
+                 && [ -s "$ent" ] && plutil -lint "$ent" >/dev/null 2>&1; then
+              codesign -f -o runtime --timestamp -s "$IDENTITY" --keychain "$KEYCHAIN" --entitlements "$ent" "$item"
+            else
+              codesign -f -o runtime --timestamp -s "$IDENTITY" --keychain "$KEYCHAIN" "$item"
+            fi
+            rm -f "$ent"
+          }
+
+          # Sparkle ships its nested helpers pre-signed by the Sparkle team and
+          # without a secure timestamp; re-sign them inside-out with our Developer
+          # ID + Hardened Runtime + timestamp so notarization accepts them.
+          SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+          if [ -d "$SPARKLE" ]; then
+            V="$SPARKLE/Versions/B"
+            for x in "$V/XPCServices/Downloader.xpc" "$V/XPCServices/Installer.xpc" \
+                     "$V/Autoupdate" "$V/Updater.app"; do
+              [ -e "$x" ] && sign_item "$x"
+            done
+            codesign -f -o runtime --timestamp -s "$IDENTITY" --keychain "$KEYCHAIN" "$SPARKLE"
+          fi
+
+          # Re-sign the app with explicit entitlements to strip the debug-only
+          # get-task-allow entitlement Xcode injects, and add the secure timestamp.
+          codesign -f -o runtime --timestamp -s "$IDENTITY" --keychain "$KEYCHAIN" \
+            --entitlements "$ENT" "$APP"
+
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          echo "Signed for distribution."
+
+      - name: Notarize
+        env:
+          HAS_NOTARY: ${{ secrets.NOTARY_APPLE_ID != '' }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+        run: |
+          if [ "$HAS_NOTARY" != "true" ] || [ -z "$NOTARY_PASSWORD" ] || [ -z "$NOTARY_TEAM_ID" ]; then
+            echo "Apple notarization credentials are required; refusing to publish an unnotarized release." >&2
+            exit 1
+          fi
+
+          APP_PATH="$RUNNER_TEMP/build/Build/Products/Release/Captures.app"
+          ZIP_PATH="$RUNNER_TEMP/notarize.zip"
+
+          ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+
+          xcrun notarytool submit "$ZIP_PATH" \
+            --apple-id "$NOTARY_APPLE_ID" \
+            --password "$NOTARY_PASSWORD" \
+            --team-id "$NOTARY_TEAM_ID" \
+            --wait
+
+          xcrun stapler staple "$APP_PATH"
+
+      - name: Create DMG
+        run: |
+          APP_PATH="$RUNNER_TEMP/build/Build/Products/Release/Captures.app"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          DIST_DIR="$GITHUB_WORKSPACE/dist/$VERSION"
+          mkdir -p "$DIST_DIR"
+
+          # Create a staging folder with the app and Applications symlink
+          STAGING="$RUNNER_TEMP/dmg-staging"
+          mkdir -p "$STAGING"
+          cp -R "$APP_PATH" "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+
+          hdiutil create \
+            -volname "Captures $VERSION" \
+            -srcfolder "$STAGING" \
+            -ov -format UDZO \
+            "$DIST_DIR/Captures-${VERSION}.dmg"
+
+      - name: Create zip
+        run: |
+          APP_PATH="$RUNNER_TEMP/build/Build/Products/Release/Captures.app"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          DIST_DIR="$GITHUB_WORKSPACE/dist/$VERSION"
+          mkdir -p "$DIST_DIR"
+          ditto -c -k --keepParent "$APP_PATH" "$DIST_DIR/Captures-${VERSION}.zip"
+
+      - name: Create stable DMG alias
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          cp "dist/$VERSION/Captures-$VERSION.dmg" "dist/$VERSION/Captures-latest.dmg"
+
+      - name: Verify local release artifacts
+        run: scripts/verify-release-artifacts.sh "${{ steps.version.outputs.VERSION }}" "dist/${{ steps.version.outputs.VERSION }}"
+
+      - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.TAG }}"
+
+          gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$TAG" \
+            -f target_commitish="$GITHUB_SHA" \
+            --jq .body > release-notes.md
+
+      - name: Create checksums
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          cd "dist/$VERSION"
+          shasum -a 256 \
+            "Captures-$VERSION.dmg" \
+            "Captures-$VERSION.zip" \
+            Captures-latest.dmg > SHA256SUMS
+
+      - name: Create draft GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: Captures ${{ steps.version.outputs.VERSION }}
+          body_path: release-notes.md
+          files: |
+            dist/${{ steps.version.outputs.VERSION }}/Captures-${{ steps.version.outputs.VERSION }}.dmg
+            dist/${{ steps.version.outputs.VERSION }}/Captures-${{ steps.version.outputs.VERSION }}.zip
+            dist/${{ steps.version.outputs.VERSION }}/Captures-latest.dmg
+            dist/${{ steps.version.outputs.VERSION }}/SHA256SUMS
+          fail_on_unmatched_files: true
+          draft: true
+          prerelease: false
+
+      - name: Verify uploaded draft artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERIFY_DIR="$RUNNER_TEMP/uploaded-release"
+          mkdir -p "$VERIFY_DIR"
+          gh release download "${{ steps.version.outputs.TAG }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$VERIFY_DIR"
+          (cd "$VERIFY_DIR" && shasum -a 256 -c SHA256SUMS)
+          scripts/verify-release-artifacts.sh "${{ steps.version.outputs.VERSION }}" "$VERIFY_DIR"
+
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "${{ steps.version.outputs.TAG }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --latest
+
+      - name: Verify public release endpoints
+        run: |
+          set -euo pipefail
+          PUBLIC_DIR="$RUNNER_TEMP/public-release"
+          mkdir -p "$PUBLIC_DIR"
+          BASE="https://github.com/$GITHUB_REPOSITORY/releases/latest/download"
+          for artifact in Captures-latest.dmg SHA256SUMS; do
+            curl --fail --location --retry 5 --retry-all-errors \
+              "$BASE/$artifact" -o "$PUBLIC_DIR/$artifact"
+          done
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          cmp "dist/$VERSION/Captures-latest.dmg" "$PUBLIC_DIR/Captures-latest.dmg"

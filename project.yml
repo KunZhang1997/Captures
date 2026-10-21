@@ -1,82 +1,100 @@
-name: Snapper
+name: Captures
 options:
   deploymentTarget:
     macOS: "14.0"
   xcodeVersion: "16.0"
-  bundleIdPrefix: com.snapper
+  bundleIdPrefix: com.captures
 
 settings:
   base:
-    MARKETING_VERSION: "1.7.1"
+    MARKETING_VERSION: "0.0.1"
     CURRENT_PROJECT_VERSION: "8"
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
 
-packages:
-  Sparkle:
-    url: https://github.com/sparkle-project/Sparkle
-    exactVersion: "2.9.4"
-
 targets:
-  Snapper:
+  Captures:
     type: application
     platform: macOS
     sources:
-      - path: Snapper
+      - path: Captures
         excludes:
           - "**/.DS_Store"
+      - path: design
+        buildPhase: resources
     resources:
-      - path: Snapper/Resources/Assets.xcassets
-      - path: Snapper/Resources/Info.plist
+      - path: Captures/Resources/Assets.xcassets
+      - path: Captures/Resources/Info.plist
         buildPhase: none
+      - path: Captures/Resources/en.lproj
+      - path: Captures/Resources/zh-Hans.lproj
+      - path: Captures/Resources/ImageEditor
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.snapper.app
-        PRODUCT_NAME: Snapper
-        INFOPLIST_FILE: Snapper/Resources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.captures.app
+        PRODUCT_NAME: Captures
+        INFOPLIST_FILE: Captures/Resources/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: Snapper/Resources/Snapper.entitlements
+        CODE_SIGN_ENTITLEMENTS: Captures/Resources/Captures.entitlements
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_STYLE: Manual
-        DEVELOPMENT_TEAM: 565U5492Q2
+        DEVELOPMENT_TEAM: GH35MC2NV4
         ARCHS: "$(ARCHS_STANDARD)"
         ONLY_ACTIVE_ARCH: NO
         LD_RUNPATH_SEARCH_PATHS:
           - "@executable_path/../Frameworks"
-        CODE_SIGN_IDENTITY: "Developer ID Application"
-    dependencies:
-      - package: Sparkle
+        CODE_SIGN_IDENTITY: "Developer ID Application: Kun Zhang (GH35MC2NV4)"
+      configs:
+        debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.captures.app
+          PRODUCT_NAME: Captures
+          INFOPLIST_KEY_CFBundleDisplayName: Captures
+          CODE_SIGN_STYLE: Manual
+          DEVELOPMENT_TEAM: GH35MC2NV4
+          CODE_SIGN_IDENTITY: "Developer ID Application: Kun Zhang (GH35MC2NV4)"
+        release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
     entitlements:
-      path: Snapper/Resources/Snapper.entitlements
+      path: Captures/Resources/Captures.entitlements
       properties:
         com.apple.security.app-sandbox: false
         com.apple.security.automation.apple-events: true
 
-  SnapperTests:
+  CapturesTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: SnapperTests
+      - path: CapturesTests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.snapper.app.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.captures.app.tests
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_STYLE: Manual
-        DEVELOPMENT_TEAM: 565U5492Q2
-        CODE_SIGN_IDENTITY: "Developer ID Application"
+        DEVELOPMENT_TEAM: GH35MC2NV4
+        CODE_SIGN_IDENTITY: "Developer ID Application: Kun Zhang (GH35MC2NV4)"
+      configs:
+        debug:
+          CODE_SIGN_STYLE: Manual
+          DEVELOPMENT_TEAM: GH35MC2NV4
+          CODE_SIGN_IDENTITY: "Developer ID Application: Kun Zhang (GH35MC2NV4)"
+        release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application"
     dependencies:
-      - target: Snapper
+      - target: Captures
 
 schemes:
-  Snapper:
+  Captures:
     build:
       targets:
-        Snapper: all
+        Captures: all
     run:
       config: Debug
     test:
       targets:
-        - SnapperTests
+        - CapturesTests
     profile:
       config: Release
     analyze:

@@ -1,0 +1,35 @@
+Captures
+Maintained by Kun Zhang / KunZhang1997
+https://github.com/KunZhang1997/Captures
+
+Upstream project
+----------------
+This project derives from Snapper by Nick Shatilo and its contributors:
+https://github.com/nickshatilo/snapper
+
+Upstream revision used as the local starting point:
+9d4571c (fix fullscreen capture inversion).
+The upstream README declares the project MIT-licensed. This repository
+includes the full MIT text in LICENSE and preserves upstream commit history.
+Names and links identify provenance; they do not imply upstream endorsement.
+
+Bundled component
+-----------------
+Filerobot Image Editor v4.9.1 by Scaleflex (MIT).
+Source: https://github.com/scaleflex/filerobot-image-editor
+Its copyright and full license are preserved in:
+Captures/Resources/ImageEditor/ThirdPartyNotices.txt
+
+Development website
+-------------------
+The optional website uses Astro. Its existing demo animation derives from
+the upstream project and illustrates features; it is not a recording of the
+current native Captures build. The optional demo source uses React and
+Remotion; consult those packages' licenses before rendering or distributing
+new video output. These tools are not native app dependencies.
+
+Public prototype imagery
+------------------------
+design/scroll-capture-reference.png is generated from fictional sample
+content by design/generate-demo-reference.swift. Personal browser history,
+private notes, real captures, and local design-QA screenshots are excluded.

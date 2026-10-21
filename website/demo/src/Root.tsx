@@ -1,11 +1,11 @@
 import { Composition } from "remotion";
-import { SnapperDemo } from "./SnapperDemo";
+import { CaptureDemo } from "./CaptureDemo";
 
 export const Root: React.FC = () => {
   return (
     <Composition
-      id="SnapperDemo"
-      component={SnapperDemo}
+      id="CaptureDemo"
+      component={CaptureDemo}
       durationInFrames={192}
       fps={24}
       width={800}

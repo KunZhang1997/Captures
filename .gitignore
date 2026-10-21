@@ -30,3 +30,22 @@ website/.astro/
 # Misc
 *.swp
 *~
+
+# Local design evidence and private reference material
+design-private/
+design-qa-assets/
+design-qa.md
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.p8
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+
+# Generated website and video outputs
+website/dist/
+website/demo/out/

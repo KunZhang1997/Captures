@@ -1,10 +1,10 @@
 {
-  "name": "snapper-demo",
-  "version": "1.0.0",
+  "name": "captures-demo",
+  "version": "0.0.1",
   "private": true,
   "scripts": {
     "studio": "npx remotion studio src/index.ts",
-    "render": "npx remotion render src/index.ts SnapperDemo --output ../public/demo.gif --codec gif"
+    "render": "npx remotion render src/index.ts CaptureDemo --output ../public/demo.gif --codec gif"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.0",

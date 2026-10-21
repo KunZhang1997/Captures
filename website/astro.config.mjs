@@ -1,7 +1,4 @@
 import { defineConfig } from 'astro/config';
-import sitemap from '@astrojs/sitemap';
 
-export default defineConfig({
-  site: 'https://snapper.tools',
-  integrations: [sitemap()],
-});
+// Configure `site` when this fork has its own deployed domain.
+export default defineConfig({});

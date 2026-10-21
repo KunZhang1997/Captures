@@ -1,0 +1,193 @@
+import Foundation
+import CoreGraphics
+
+@Observable
+final class UndoRedoManager {
+    private let maxHistoryDepth = 200
+    /// Snapshot actions retain full-resolution CGImages (each crop produces a
+    /// distinct one), so the stacks are bounded by bytes as well as depth.
+    private let maxImageBudgetBytes = 512 * 1024 * 1024
+    private var undoStack: [UndoAction] = []
+    private var redoStack: [UndoAction] = []
+
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
+    /// A document reset establishes a new editing baseline.  Keep this
+    /// separate from undo so the user cannot accidentally redo annotations
+    /// belonging to the discarded document state.
+    func reset() {
+        undoStack.removeAll(keepingCapacity: false)
+        redoStack.removeAll(keepingCapacity: false)
+    }
+
+    func recordAdd(annotation: any Annotation, state: CanvasState) {
+        record(.add(annotation))
+    }
+
+    func recordRemove(annotation: any Annotation, state: CanvasState) {
+        record(.remove(annotation))
+    }
+
+    func recordModify(oldAnnotation: any Annotation, newAnnotation: any Annotation, state: CanvasState) {
+        record(.modify(old: oldAnnotation, new: newAnnotation))
+    }
+
+    func recordSnapshot(oldState: CanvasState.Snapshot, newState: CanvasState.Snapshot, state: CanvasState) {
+        if isRedundantSnapshot(oldState: oldState, newState: newState) {
+            return
+        }
+        record(.snapshot(old: oldState, new: newState))
+    }
+
+    func undo(state: CanvasState) {
+        guard let action = undoStack.popLast() else { return }
+        applyInverse(action, to: state)
+        redoStack.append(action)
+        trim(&redoStack)
+    }
+
+    func redo(state: CanvasState) {
+        guard let action = redoStack.popLast() else { return }
+        apply(action, to: state)
+        undoStack.append(action)
+        trim(&undoStack)
+    }
+
+    private func record(_ action: UndoAction) {
+        undoStack.append(action)
+        trim(&undoStack)
+        redoStack.removeAll(keepingCapacity: true)
+    }
+
+    private func trim(_ stack: inout [UndoAction]) {
+        let overflow = stack.count - maxHistoryDepth
+        if overflow > 0 {
+            stack.removeFirst(overflow)
+        }
+
+        var totalBytes = 0
+        for (index, action) in stack.enumerated().reversed() {
+            totalBytes += approximateCost(of: action)
+            if totalBytes > maxImageBudgetBytes, index < stack.count - 1 {
+                // Keep the newer entries; drop everything at and before the
+                // action that crossed the budget.
+                stack.removeFirst(index + 1)
+                break
+            }
+        }
+    }
+
+    private func approximateCost(of action: UndoAction) -> Int {
+        switch action {
+        case .add, .remove, .modify:
+            return 1024
+        case .snapshot(let old, let new):
+            let oldBytes = imageBytes(old.baseImage)
+            return isSameImage(old.baseImage, new.baseImage)
+                ? oldBytes
+                : oldBytes + imageBytes(new.baseImage)
+        }
+    }
+
+    private func imageBytes(_ image: CGImage) -> Int {
+        image.bytesPerRow * image.height
+    }
+
+    private func isRedundantSnapshot(oldState: CanvasState.Snapshot, newState: CanvasState.Snapshot) -> Bool {
+        if snapshotsEquivalent(oldState, newState) {
+            return true
+        }
+
+        guard case .snapshot(_, let lastNew)? = undoStack.last else {
+            return false
+        }
+
+        return snapshotsEquivalent(lastNew, newState)
+    }
+
+    private func snapshotsEquivalent(_ lhs: CanvasState.Snapshot, _ rhs: CanvasState.Snapshot) -> Bool {
+        if lhs.selectedAnnotationID != rhs.selectedAnnotationID {
+            return false
+        }
+        if lhs.selectedAnnotationIDs != rhs.selectedAnnotationIDs {
+            return false
+        }
+        if lhs.annotations.count != rhs.annotations.count {
+            return false
+        }
+        if !isSameImage(lhs.baseImage, rhs.baseImage) {
+            return false
+        }
+        if lhs.rasterAdjustment != rhs.rasterAdjustment {
+            return false
+        }
+        if lhs.outputResize != rhs.outputResize {
+            return false
+        }
+
+        for (left, right) in zip(lhs.annotations, rhs.annotations) {
+            if type(of: left) != type(of: right) {
+                return false
+            }
+            if left.id != right.id {
+                return false
+            }
+            if left.zOrder != right.zOrder || left.isVisible != right.isVisible {
+                return false
+            }
+            if left.boundingRect != right.boundingRect {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    private func isSameImage(_ lhs: CGImage, _ rhs: CGImage) -> Bool {
+        let lhsPtr = Unmanaged.passUnretained(lhs).toOpaque()
+        let rhsPtr = Unmanaged.passUnretained(rhs).toOpaque()
+        return lhsPtr == rhsPtr
+    }
+
+    private func apply(_ action: UndoAction, to state: CanvasState) {
+        switch action {
+        case .add(let annotation):
+            state.annotations.append(annotation)
+        case .remove(let annotation):
+            state.annotations.removeAll { $0.id == annotation.id }
+        case .modify(_, let new):
+            replaceAnnotation(with: new, in: state)
+        case .snapshot(_, let new):
+            state.restore(from: new)
+        }
+    }
+
+    private func applyInverse(_ action: UndoAction, to state: CanvasState) {
+        switch action {
+        case .add(let annotation):
+            state.annotations.removeAll { $0.id == annotation.id }
+        case .remove(let annotation):
+            state.annotations.append(annotation)
+        case .modify(let old, _):
+            replaceAnnotation(with: old, in: state)
+        case .snapshot(let old, _):
+            state.restore(from: old)
+        }
+    }
+
+    private func replaceAnnotation(with annotation: any Annotation, in state: CanvasState) {
+        if let index = state.annotations.firstIndex(where: { $0.id == annotation.id }) {
+            state.annotations[index] = annotation
+        } else {
+            state.annotations.append(annotation)
+        }
+    }
+}
+
+private enum UndoAction {
+    case add(any Annotation)
+    case remove(any Annotation)
+    case modify(old: any Annotation, new: any Annotation)
+    case snapshot(old: CanvasState.Snapshot, new: CanvasState.Snapshot)
+}
