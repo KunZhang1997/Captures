@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      signed_build:
+        description: 'Run Apple-signed build and tests (requires signing secrets)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-source:
+    name: Validate source configuration
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Validate property lists and release script
+        run: |
+          plutil -lint Captures/Resources/Info.plist
+          plutil -lint Captures/Resources/Captures.entitlements
+          bash -n scripts/verify-release-artifacts.sh
+      - name: Check patch formatting
+        run: git show --format= --check HEAD
+
+  signed-build-and-test:
+    name: Apple-signed build and tests
+    if: github.event_name == 'workflow_dispatch' && inputs.signed_build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Resolve package dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -scheme Captures \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm"
+
+      - name: Import Apple signing certificate
+        id: signing
+        env:
+          HAS_CERT: ${{ secrets.CERTIFICATE_P12 != '' }}
+          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          if [ "$HAS_CERT" != "true" ]; then
+            echo "CERTIFICATE_P12 is required; refusing to create an unsigned CI build." >&2
+            exit 1
+          fi
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | sed -n 's/.*"\(.*\)"/\1/p' | grep '^Developer ID Application:' | head -n1)"
+          if [ -z "$IDENTITY" ]; then
+            echo "No Developer ID Application identity found in imported keychain" >&2
+            exit 1
+          fi
+
+          echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
+          echo "keychain=$KEYCHAIN_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -scheme Captures \
+            -destination 'platform=macOS' \
+            -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/build" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm" \
+            CODE_SIGN_STYLE=Manual \
+            "CODE_SIGN_IDENTITY=${{ steps.signing.outputs.identity }}" \
+            "OTHER_CODE_SIGN_FLAGS=--keychain ${{ steps.signing.outputs.keychain }}"
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -scheme Captures \
+            -destination 'platform=macOS' \
+            -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/build" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm" \
+            CODE_SIGN_STYLE=Manual \
+            "CODE_SIGN_IDENTITY=${{ steps.signing.outputs.identity }}" \
+            "OTHER_CODE_SIGN_FLAGS=--keychain ${{ steps.signing.outputs.keychain }}"
