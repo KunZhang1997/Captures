@@ -214,6 +214,10 @@ Always use Apple identity signing. Never use ad-hoc signing. All builds must be 
   screen captures. Private source material belongs in ignored `design-private/`.
 - Public introduction and build instructions live in `README.md`; the detailed
   visual and interaction contract is retained in `docs/prototype-guide.md`.
+- Keep public GitHub content in Simplified Chinese and English. `README.md`,
+  `CONTRIBUTING.md`, and `docs/releases/{version}.md` have `.en.md` companions
+  with reciprocal language links. Update both languages together, including
+  the repository description and published GitHub Release notes when relevant.
 - Push/PR CI validates source configuration. Signed build/test is an explicit
   workflow-dispatch option requiring Apple signing secrets. Never imply a
   passing source-validation job proves a signed build or real-user acceptance.

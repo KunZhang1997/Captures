@@ -1,5 +1,7 @@
 # 参与 Captures
 
+**简体中文** · [English](CONTRIBUTING.en.md)
+
 可以提交问题、改进建议、文档修正或 Pull Request。开发环境和首次构建步骤见 [README](README.md#build-from-source)。
 
 ## 反馈问题
