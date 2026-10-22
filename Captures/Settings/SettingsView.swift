@@ -520,6 +520,8 @@ struct SettingsView: View {
             Text("Open source macOS screenshot tool.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            GitHubRepositoryLink()
         }
     }
 
